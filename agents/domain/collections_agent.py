@@ -205,10 +205,34 @@ ORDER BY gns1_count DESC
         
         # 2. Inject schema into LLM agent's instruction (update the sub-agent)
         original_instruction = self.sql_generator.instruction
-        enhanced_instruction = original_instruction.replace(
-            "{{SCHEMA_PLACEHOLDER}}",
-            schema_info
-        )
+        # First, if we have an InvocationContext with a session, populate the
+        # session state so ADK's instructions preprocessor can inject the
+        # `SCHEMA_PLACEHOLDER` safely without raising KeyError.
+        if context is not None and hasattr(context, 'session') and hasattr(context.session, 'state'):
+            try:
+                context.session.state['SCHEMA_PLACEHOLDER'] = schema_info
+            except Exception:
+                # Non-fatal: fall back to direct string replacement below
+                logger.debug("Failed to set session state SCHEMA_PLACEHOLDER; will use fallback replacement")
+
+        # Fallback: replace both double-brace and single-brace placeholders
+        # directly in the instruction. Handle cases where the agent's
+        # `instruction` may be a callable/provider rather than a plain string.
+        try:
+            if isinstance(original_instruction, str):
+                instr_text = original_instruction
+            else:
+                # Avoid invoking callables that may require arguments.
+                instr_text = str(original_instruction)
+        except Exception:
+            instr_text = str(original_instruction)
+
+        if "{{SCHEMA_PLACEHOLDER}}" in instr_text:
+            instr_text = instr_text.replace("{{SCHEMA_PLACEHOLDER}}", schema_info)
+        if "{SCHEMA_PLACEHOLDER}" in instr_text:
+            instr_text = instr_text.replace("{SCHEMA_PLACEHOLDER}", schema_info)
+
+        enhanced_instruction = instr_text
         self.sql_generator.instruction = enhanced_instruction
         
         # 3. Invoke the Sub-Agent
@@ -225,6 +249,13 @@ ORDER BY gns1_count DESC
         finally:
             # Restore original instruction
             self.sql_generator.instruction = original_instruction
+            # Clear injected schema from session state to avoid persistence
+            try:
+                if context is not None and hasattr(context, 'session') and hasattr(context.session, 'state'):
+                    if 'SCHEMA_PLACEHOLDER' in context.session.state:
+                        del context.session.state['SCHEMA_PLACEHOLDER']
+            except Exception:
+                logger.debug("Failed to clear SCHEMA_PLACEHOLDER from session state")
 
         # 4. Parse Result
         return self._parse_and_validate(accumulated_text, request.user_question)

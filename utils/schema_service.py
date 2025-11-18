@@ -132,14 +132,19 @@ class SchemaService:
         """
         try:
             query = f"""
-            SELECT column_name, description
+            SELECT DISTINCT
+              column_name,
+              description
             FROM `{self.project_id}.{dataset_id}.INFORMATION_SCHEMA.COLUMN_FIELD_PATHS`
-            WHERE table_name = @table_id AND column_name IS NOT NULL
+            WHERE table_schema = @dataset_id
+              AND table_name = @table_id
+              AND column_name IS NOT NULL
             """
             
-            job_config = self.client.QueryJobConfig(
+            job_config = bigquery.QueryJobConfig(
                 query_parameters=[
-                    self.client.query_job.ScalarQueryParameter("table_id", "STRING", table_id)
+                    bigquery.ScalarQueryParameter("dataset_id", "STRING", dataset_id),
+                    bigquery.ScalarQueryParameter("table_id", "STRING", table_id)
                 ]
             )
             
@@ -148,8 +153,8 @@ class SchemaService:
             
             descriptions = {}
             for row in results:
-                if row.description:
-                    descriptions[row.column_name] = row.description
+                if row.description and row.column_name:
+                    descriptions[row.column_name] = str(row.description)
             
             logger.debug(f"Fetched {len(descriptions)} descriptions from INFORMATION_SCHEMA")
             return descriptions
@@ -251,6 +256,14 @@ class SchemaService:
             type_info = field['type']
             desc = field['description']
             
+            # Ensure desc is a string (handle list or None cases)
+            if isinstance(desc, list):
+                desc = " ".join(str(d) for d in desc)
+            elif desc is None:
+                desc = "N/A"
+            else:
+                desc = str(desc)
+            
             # Extract critical rules from description
             if 'CRITICAL RULE' in desc:
                 critical_rules.append({
@@ -324,7 +337,7 @@ class SchemaService:
         
         # Add critical rules section
         if critical_rules:
-            output += "## " + categories["⚠️ CRITICAL RULES - MUST FOLLOW"] + "\n"
+            output += "## ⚠️ CRITICAL RULES - MUST FOLLOW\n"
             for rule_info in critical_rules:
                 output += f"\n**{rule_info['field']}:**\n{rule_info['rule']}\n"
         
