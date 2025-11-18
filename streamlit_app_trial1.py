@@ -89,6 +89,15 @@ def get_session_service():
     from google.adk.sessions import InMemorySessionService
     return InMemorySessionService()
 
+def clear_session_by_id(session_id: str):
+    """Clear a specific session from the service"""
+    session_service = get_session_service()
+    if hasattr(session_service, '_sessions') and session_id in session_service._sessions:
+        del session_service._sessions[session_id]
+        logger.info(f"Cleared session: {session_id}")
+        return True
+    return False
+
 # ---------------------- CORE LOGIC ----------------------
 
 async def run_agent_query_async(user_question: str, session_id: str):
@@ -107,16 +116,35 @@ async def run_agent_query_async(user_question: str, session_id: str):
     from google.genai.types import Content, Part
 
     # 1. Get/Create Session
+    # Check if session exists in the service's internal storage
     try:
-        session = await session_service.get_session(session_id)
-        logger.info(f"Resuming session: {session_id}")
-    except:
+        # InMemorySessionService stores sessions internally
+        # Try to create first, catch AlreadyExistsError if it exists
         session = await session_service.create_session(
             session_id=session_id,
             app_name="streamlit-copilot",
             user_id="streamlit-user"
         )
-        logger.info(f"Created session: {session_id}")
+        logger.info(f"Created new session: {session_id}")
+    except Exception as e:
+        # If session already exists, retrieve it from the internal storage
+        if "already exists" in str(e).lower():
+            # Access internal session storage (InMemorySessionService stores in _sessions dict)
+            if hasattr(session_service, '_sessions') and session_id in session_service._sessions:
+                session = session_service._sessions[session_id]
+                logger.info(f"Resuming existing session: {session_id}")
+            else:
+                # If can't retrieve, create with new ID
+                logger.warning(f"Session {session_id} exists but couldn't retrieve. Creating new session.")
+                session_id = str(uuid.uuid4())
+                session = await session_service.create_session(
+                    session_id=session_id,
+                    app_name="streamlit-copilot",
+                    user_id="streamlit-user"
+                )
+                logger.info(f"Created fallback session: {session_id}")
+        else:
+            raise
 
     # 2. Build Context
     user_content = Content(parts=[Part(text=user_question)], role="user")
@@ -183,9 +211,22 @@ def main():
         if settings:
             model_name = getattr(settings, 'gemini_flash_model', 'Unknown')
             st.success(f"Model: `{model_name}`")
-            if st.button("Clear Cache & Reload"):
-                st.cache_resource.clear()
-                st.rerun()
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("Clear Cache"):
+                    st.cache_resource.clear()
+                    st.rerun()
+            with col2:
+                if st.button("New Session"):
+                    # Clear old session from service
+                    old_session_id = st.session_state.get("session_id")
+                    if old_session_id:
+                        clear_session_by_id(old_session_id)
+                    # Create new session ID
+                    st.session_state.session_id = str(uuid.uuid4())
+                    st.session_state.history = []
+                    st.rerun()
         else:
             st.error("Agent failed to load.")
             st.stop()

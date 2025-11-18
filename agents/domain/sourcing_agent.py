@@ -55,11 +55,12 @@ Table: `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.sourcing
 ## Critical Business Rules
 
 ### 1. Date Filtering
-- **Primary Date Field**: `LastModifiedDate` for ALL time-based filtering
+- **Primary Date Field**: `LastModifiedDate` (TIMESTAMP) for ALL time-based filtering
+- **CRITICAL**: `LastModifiedDate` is TIMESTAMP - must cast to DATE for comparison
 - **"Last N months"**:
 ```sql
-WHERE LastModifiedDate >= DATE_SUB(DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH), INTERVAL N MONTH)
-  AND LastModifiedDate <= LAST_DAY(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH))
+WHERE DATE(LastModifiedDate) >= DATE_SUB(DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH), INTERVAL N MONTH)
+  AND DATE(LastModifiedDate) <= LAST_DAY(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH))
 ```
 
 ### 2. Status Rules
@@ -74,7 +75,7 @@ WHERE LastModifiedDate >= DATE_SUB(DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 
 - To Crores: `ROUND(SUM(amount) / 10000000, 2)`
 
 ### 5. Monthly Aggregation
-- Group by: `DATE_TRUNC(LastModifiedDate, MONTH) as month`
+- Group by: `DATE_TRUNC(DATE(LastModifiedDate), MONTH) as month`
 - Format: `FORMAT_DATE('%b %Y', month)`
 
 ## Output Format
@@ -87,12 +88,12 @@ Response:
 ```sql
 WITH monthly_data AS (
   SELECT 
-    DATE_TRUNC(LastModifiedDate, MONTH) as month,
+    DATE_TRUNC(DATE(LastModifiedDate), MONTH) as month,
     COUNT(*) as total_applications,
     COUNT(CASE WHEN BRE_Sanction_Result__c = 'ACCEPT' OR ABND IS NOT NULL THEN 1 END) as approved_count
   FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.sourcing_table}`
-  WHERE LastModifiedDate >= DATE_SUB(DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH), INTERVAL 3 MONTH)
-    AND LastModifiedDate <= LAST_DAY(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH))
+  WHERE DATE(LastModifiedDate) >= DATE_SUB(DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH), INTERVAL 3 MONTH)
+    AND DATE(LastModifiedDate) <= LAST_DAY(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH))
   GROUP BY month
 )
 SELECT 

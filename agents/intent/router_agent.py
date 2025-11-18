@@ -59,12 +59,14 @@ class IntentRouterAgent(BaseAgent):
                 'application', 'approval', 'sourcing', 'acquisition',
                 'apply', 'customer', 'segment', 'product', 'conversion',
                 'funnel', 'bre', 'sanction', 'manufacturer', 'dealer',
-                'branch', 'rejected', 'accepted', 'abnd', 'asset cost'
+                'branch', 'rejected', 'accepted', 'abnd', 'asset cost',
+                'login', 'logins', 'lead', 'leads', 'onboarding'
             ],
             'patterns': [
                 r'\bapproval\s+rate\b',
                 r'\bconversion\s+rate\b',
-                r'\bapplication\s+volume\b',
+                r'\bapplication\s+(volume|count|login)\b',
+                r'\bloan\s+application\b',
             ],
         },
         DomainType.DISBURSAL: {
@@ -84,15 +86,30 @@ class IntentRouterAgent(BaseAgent):
     CONFIDENCE_THRESHOLD: ClassVar[float] = 0.6
 
     # INSTRUCTION FOR THE SUB-AGENT
-    CLASSIFIER_INSTRUCTION: ClassVar[str] = """
-    You are an intent classifier for a finance analytics system.
-    Classify the user's input into exactly one of these domains:
-    1. SOURCING (Loans, applications, approvals, acquisition)
-    2. COLLECTIONS (Delinquency, DPD, recovery, overdue payments)
-    3. DISBURSAL (Payouts, fund transfers, payment modes)
+    CLASSIFIER_INSTRUCTION: ClassVar[str] = """You are a domain classifier. Classify the question into exactly ONE domain.
 
-    Response Format: Return ONLY the single word of the domain (e.g., "SOURCING"). Do not add punctuation or explanation.
-    """
+**DOMAINS:**
+- SOURCING: Applications, approvals, customer acquisition, loan processing
+- COLLECTIONS: DPD, delinquency, recovery, overdue payments, portfolio health
+- DISBURSAL: Payouts, fund transfers, disbursement amounts, payment modes
+
+**CRITICAL RULES:**
+1. Return ONLY one word: SOURCING, COLLECTIONS, or DISBURSAL
+2. DO NOT add punctuation, explanation, or greetings
+3. DO NOT say "okay", "sure", or acknowledge - just return the domain name
+4. If uncertain, return SOURCING
+
+**Examples:**
+Question: "What is the dpd distrubution month on month for last 6 months?"
+Response: COLLECTIONS
+
+Question: "What is login to approval conversion rate in last 6 months?"
+Response: SOURCING
+
+Question: "What is disbursal count?"
+Response: DISBURSAL
+
+Now classify this question and return ONLY the domain name:"""
 
     def __init__(self):
         model_name = settings.gemini_flash_model
@@ -196,9 +213,6 @@ class IntentRouterAgent(BaseAgent):
         """
         Uses the LlmAgent sub-agent to classify.
         """
-        # NOTE: We rely on the Orchestrator to have set ctx.current_input correctly.
-        # We do NOT manually wipe history here to avoid ADK version errors.
-        
         response_text = ""
         try:
             async for event in self.classifier.run_async(ctx):
@@ -210,15 +224,31 @@ class IntentRouterAgent(BaseAgent):
             logger.error(f"LLM Classification failed: {e}")
             return self._fallback_routing(question)
 
-        # Parse Response
+        # Parse Response - be aggressive in extracting domain
         cleaned_response = response_text.strip().upper()
         
-        # Check if response matches any known domain
+        # Remove common noise words
+        cleaned_response = re.sub(r'\bOKAY\b|\bSURE\b|\bYES\b|\bNO\b|\bTHE\b|\bIS\b', '', cleaned_response)
+        cleaned_response = cleaned_response.strip()
+        
+        # Check if response matches any known domain (exact or contains)
         for domain in DomainType:
             if domain.value in cleaned_response:
+                logger.info(f"LLM classified as: {domain.value}")
                 return domain
         
-        logger.warning(f"LLM returned unclear response: {cleaned_response}")
+        # If still unclear, try partial matching
+        if "SOURC" in cleaned_response or "APPLIC" in cleaned_response or "APPROVAL" in cleaned_response:
+            logger.info(f"LLM partial match: SOURCING (from '{cleaned_response}')")
+            return DomainType.SOURCING
+        if "COLLECT" in cleaned_response or "DPD" in cleaned_response or "DELINQ" in cleaned_response:
+            logger.info(f"LLM partial match: COLLECTIONS (from '{cleaned_response}')")
+            return DomainType.COLLECTIONS
+        if "DISBURS" in cleaned_response or "PAYOUT" in cleaned_response:
+            logger.info(f"LLM partial match: DISBURSAL (from '{cleaned_response}')")
+            return DomainType.DISBURSAL
+        
+        logger.warning(f"LLM returned unclear response: '{cleaned_response}' - falling back to keyword routing")
         return self._fallback_routing(question)
 
     def _calculate_keyword_scores(self, question: str) -> Dict[DomainType, float]:

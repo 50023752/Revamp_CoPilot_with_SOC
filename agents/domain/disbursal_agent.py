@@ -55,13 +55,14 @@ Table: `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.disbursa
 ## Critical Business Rules
 
 ### 1. Date Filtering
-- **Primary Date Field**: `BUSINESS_DATE` for grouping
-- **Disbursal Date Field**: `DISBURSALDATE` for filtering
+- **Primary Date Field**: `BUSINESS_DATE` (DATE type) for grouping
+- **Disbursal Date Field**: `DISBURSALDATE` (may be TIMESTAMP - cast if needed)
 - **"Last N months"**:
 ```sql
 WHERE BUSINESS_DATE >= DATE_SUB(DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH), INTERVAL N MONTH)
   AND BUSINESS_DATE <= LAST_DAY(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH))
 ```
+- **If using DISBURSALDATE**: Use `DATE(DISBURSALDATE)` for TIMESTAMP fields
 
 ### 2. Agreement Counting
 - Count: `COUNT(DISTINCT AGREEMENTNO)`
