@@ -116,35 +116,29 @@ async def run_agent_query_async(user_question: str, session_id: str):
     from google.genai.types import Content, Part
 
     # 1. Get/Create Session
-    # Check if session exists in the service's internal storage
-    try:
-        # InMemorySessionService stores sessions internally
-        # Try to create first, catch AlreadyExistsError if it exists
-        session = await session_service.create_session(
-            session_id=session_id,
-            app_name="streamlit-copilot",
-            user_id="streamlit-user"
-        )
-        logger.info(f"Created new session: {session_id}")
-    except Exception as e:
-        # If session already exists, retrieve it from the internal storage
-        if "already exists" in str(e).lower():
-            # Access internal session storage (InMemorySessionService stores in _sessions dict)
-            if hasattr(session_service, '_sessions') and session_id in session_service._sessions:
-                session = session_service._sessions[session_id]
-                logger.info(f"Resuming existing session: {session_id}")
+    # Check if session exists, if yes reuse it, else create new one
+    session = None
+    if hasattr(session_service, '_sessions') and session_id in session_service._sessions:
+        session = session_service._sessions[session_id]
+        logger.info(f"Reusing existing session: {session_id}")
+    else:
+        try:
+            session = await session_service.create_session(
+                session_id=session_id,
+                app_name="streamlit-copilot",
+                user_id="streamlit-user"
+            )
+            logger.info(f"Created new session: {session_id}")
+        except Exception as e:
+            if "already exists" in str(e).lower():
+                # Race condition - session was just created, retrieve it
+                if hasattr(session_service, '_sessions') and session_id in session_service._sessions:
+                    session = session_service._sessions[session_id]
+                    logger.info(f"Retrieved race-created session: {session_id}")
+                else:
+                    raise ValueError(f"Session {session_id} exists but unreachable")
             else:
-                # If can't retrieve, create with new ID
-                logger.warning(f"Session {session_id} exists but couldn't retrieve. Creating new session.")
-                session_id = str(uuid.uuid4())
-                session = await session_service.create_session(
-                    session_id=session_id,
-                    app_name="streamlit-copilot",
-                    user_id="streamlit-user"
-                )
-                logger.info(f"Created fallback session: {session_id}")
-        else:
-            raise
+                raise
 
     # 2. Build Context
     user_content = Content(parts=[Part(text=user_question)], role="user")

@@ -54,6 +54,14 @@ Table: `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.disbursa
 
 ## Critical Business Rules
 
+### ⚠️ MANDATORY BIGQUERY TYPE RULE ⚠️
+**If any TIMESTAMP fields exist, wrap in DATE() for date comparisons:**
+- `BUSINESS_DATE` is DATE type (no casting needed)
+- `DISBURSALDATE` may be TIMESTAMP (use DATE() if filtering)
+- **WRONG**: `WHERE DISBURSALDATE >= DATE_SUB(...)`  ❌ TYPE ERROR
+- **CORRECT**: `WHERE DATE(DISBURSALDATE) >= DATE_SUB(...)`  ✅ WORKS
+- **Rule**: When unsure, using DATE() is safe for both DATE and TIMESTAMP types
+
 ### 1. Date Filtering
 - **Primary Date Field**: `BUSINESS_DATE` (DATE type) for grouping
 - **Disbursal Date Field**: `DISBURSALDATE` (may be TIMESTAMP - cast if needed)
@@ -62,7 +70,7 @@ Table: `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.disbursa
 WHERE BUSINESS_DATE >= DATE_SUB(DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH), INTERVAL N MONTH)
   AND BUSINESS_DATE <= LAST_DAY(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH))
 ```
-- **If using DISBURSALDATE**: Use `DATE(DISBURSALDATE)` for TIMESTAMP fields
+- **If filtering by DISBURSALDATE**: `WHERE DATE(DISBURSALDATE) >= ...`
 
 ### 2. Agreement Counting
 - Count: `COUNT(DISTINCT AGREEMENTNO)`

@@ -54,9 +54,16 @@ Table: `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.sourcing
 
 ## Critical Business Rules
 
+### ⚠️ MANDATORY BIGQUERY TYPE RULE ⚠️
+**ALL TIMESTAMP fields MUST be wrapped in DATE() for date comparisons:**
+- `LastModifiedDate` is TIMESTAMP type
+- `CreatedDate` is TIMESTAMP type
+- **WRONG**: `WHERE LastModifiedDate >= DATE_SUB(...)`  ❌ TYPE ERROR
+- **CORRECT**: `WHERE DATE(LastModifiedDate) >= DATE_SUB(...)`  ✅ WORKS
+- **Rule**: If comparing to DATE functions, ALWAYS use DATE(field_name)
+
 ### 1. Date Filtering
 - **Primary Date Field**: `LastModifiedDate` (TIMESTAMP) for ALL time-based filtering
-- **CRITICAL**: `LastModifiedDate` is TIMESTAMP - must cast to DATE for comparison
 - **"Last N months"**:
 ```sql
 WHERE DATE(LastModifiedDate) >= DATE_SUB(DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH), INTERVAL N MONTH)
