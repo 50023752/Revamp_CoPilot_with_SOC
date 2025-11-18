@@ -25,6 +25,7 @@ from contracts.sql_contracts import (
     SQLGenerationResponse,
     QueryMetadata
 )
+from utils.schema_service import get_schema_service
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +44,7 @@ class DisbursalAgent(BaseAgent):
     sql_generator: LlmAgent
     model_config = {"arbitrary_types_allowed": True}
     
-    # SQL generation instruction
+    # SQL generation instruction (schema injected dynamically)
     INSTRUCTION_TEMPLATE: ClassVar[str] = f"""You are a BigQuery SQL expert for L&T Finance Two-Wheeler **disbursal data**.
 
 **YOUR TASK**: Generate ONLY the SQL query based on the specific Question provided below.
@@ -51,6 +52,9 @@ class DisbursalAgent(BaseAgent):
 
 ## Table Information
 Table: `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.disbursal_table}`
+
+## Actual Table Schema (from BigQuery)
+{{SCHEMA_PLACEHOLDER}}
 
 ## Critical Business Rules
 
@@ -179,8 +183,27 @@ ORDER BY month DESC
         Compatible with Orchestrator calls and Unit Tests.
         """
         
+        # 1. Fetch actual schema from BigQuery
+        try:
+            schema_service = get_schema_service(settings.gcp_project_id)
+            schema_info = schema_service.get_critical_fields_only(
+                settings.bigquery_dataset,
+                settings.disbursal_table
+            )
+            logger.info(f"Injecting schema: {len(schema_info)} characters")
+        except Exception as e:
+            logger.warning(f"Schema fetch failed, using fallback: {e}")
+            schema_info = "Schema unavailable - infer from business rules"
+        
+        # 2. Inject schema into LLM agent's instruction
+        original_instruction = self.sql_generator.instruction
+        enhanced_instruction = original_instruction.replace(
+            "{{SCHEMA_PLACEHOLDER}}",
+            schema_info
+        )
+        self.sql_generator.instruction = enhanced_instruction
+        
         # 3. Invoke the Sub-Agent
-        # We must iterate over the generator to allow the sub-agent to process
         accumulated_text = ""
         try:
             async for event in self.sql_generator.run_async(context):
@@ -191,6 +214,9 @@ ORDER BY month DESC
         except Exception as e:
             logger.error(f"Sub-agent execution failed: {e}")
             raise
+        finally:
+            # Restore original instruction
+            self.sql_generator.instruction = original_instruction
 
         # 4. Parse Result
         return self._parse_and_validate(accumulated_text, request.user_question)

@@ -1,0 +1,1425 @@
+[
+  {
+    "description": "Indicates if the payment has bounced for the current month (1 for bounce, 0 for no bounce).",
+    "name": "Net_Bounce_Flag",
+    "type": "INTEGER"
+  },
+  {
+    "description": "The month on book from the installment start date. For example, a value of 1 indicates the account's first EMI month.",
+    "name": "MOB_ON_INSTL_START_DATE",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Indicates if the customer has completed 3 months on the book (1 for yes, 0 for no).",
+    "name": "MOB_3M_Flag",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Indicates if the customer has been 0+ days past due in the last 3 months (1 for yes, 0 for no).",
+    "name": "MOB_3M_EVER_0PLUS_Flag",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Indicates if the customer has completed 6 months on the book (1 for yes, 0 for no).",
+    "name": "MOB_6M_Flag",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Indicates if the customer has been 30+ days past due in the last 6 months (1 for yes, 0 for no).",
+    "name": "MOB_6M_EVER_30PLUS_Flag",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Indicates if the customer has completed 12 months on the book (1 for yes, 0 for no).",
+    "name": "MOB_12M_Flag",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Indicates if the customer has been 30+ days past due in the last 12 months (1 for yes, 0 for no).",
+    "name": "MOB_12M_EVER_30PLUS_Flag",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Indicates if the customer has been 60+ days past due in the last 12 months (1 for yes, 0 for no).",
+    "name": "MOB_12M_EVER_60PLUS_Flag",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Indicates if the customer has been 90+ days past due in the last 6 months (1 for yes, 0 for no).",
+    "name": "MOB_6M_EVER_90PLUS_Flag",
+    "type": "INTEGER"
+  },
+  {
+    "description": "The zone of the branch.",
+    "name": "BRANCH_ZONE",
+    "type": "STRING"
+  },
+  {
+    "description": "The zone of the customer.",
+    "name": "CUST_ZONE",
+    "type": "STRING"
+  },
+  {
+    "description": "The overall recurring payment due.",
+    "name": "RC_DUE_OVERALL",
+    "type": "INTEGER"
+  },
+  {
+    "description": "The overall recurring payment pending.",
+    "name": "RC_PENDING_OVERALL",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Last year's Principal Outstanding - the current remaining principal balance on the loan.",
+    "name": "LY_POS",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Indicates if the customer was 1-30 days past due last year (1 for yes, 0 for no).",
+    "name": "Delinquency_1_30_LY_Flag",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Indicates if the customer was 30-60 days past due last year (1 for yes, 0 for no).",
+    "name": "Delinquency_30_60_LY_Flag",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Indicates if the customer was 60-90 days past due last year (1 for yes, 0 for no).",
+    "name": "Delinquency_60_90_LY_Flag",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Indicates if the customer has slipped from 0 days past due last year to 90+ days past due currently (1 for yes, 0 for no).",
+    "name": "Delinquency_0LY_90PLUSCurrent_SLIPPAGE_Flag",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Indicates if the customer has slipped from 1-30 days past due last year to 90+ days past due currently (1 for yes, 0 for no).",
+    "name": "Delinquency_1_30LY_90PLUSCurrent_SLIPPAGE_Flag",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Indicates if the customer has slipped from 31-60 days past due last year to 90+ days past due currently (1 for yes, 0 for no).",
+    "name": "Delinquency_31_60LY_90PLUSCurrent_SLIPPAGE_Flag",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Indicates if the customer has slipped from 61-90 days past due last year to 90+ days past due currently (1 for yes, 0 for no).",
+    "name": "Delinquency_61_90LY_90PLUSCurrent_SLIPPAGE_Flag",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Indicates if the customer has been 0+ days past due in the last 6 months (1 for yes, 0 for no).",
+    "name": "MOB_6M_EVER_0PLUS_Flag",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Gross Non-Starter for 4th EMI ('Y'/'N'). CRITICAL RULE: This is only valid for accounts in their 4th month. Any calculation MUST be filtered for MOB_ON_INSTL_START_DATE = 4.",
+    "name": "FMI_GNS4",
+    "type": "STRING"
+  },
+  {
+    "description": "The score from the Early Warning System model.",
+    "name": "EWS_Model_Score",
+    "type": "FLOAT"
+  },
+  {
+    "description": "The output band from the Early Warning System model. CRITICAL RULE: For analysis, you MUST use a CASE statement to group the raw values into these exact three bands, ordered from lowest to highest risk: 'Low' (for values R1-R3), 'Medium' (for values R4-R7), and 'High' (for values R8-R10 and above).",
+    "name": "EWS_Model_Output_Band",
+    "type": "STRING"
+  },
+  {
+    "description": "Indicates if the loan was disbursed in the last 3 months (1 for yes, 0 for no).",
+    "name": "Last3M_Disbursed_Flag",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Indicates if the customer has been 90+ days past due in the last 12 months (1 for yes, 0 for no).",
+    "name": "MOB_12M_EVER_90PLUS_Flag",
+    "type": "INTEGER"
+  },
+  {
+    "description": "The financial loss amount associated with the Principal Outstanding.",
+    "name": "POS_LOSS",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Indicates if the customer is risky in the last 6 months (1 for yes, 0 for no).",
+    "name": "RISK_MOB_6M_Flag",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Indicates if the customer is risky in the last 12 months (1 for yes, 0 for no).",
+    "name": "RISK_MOB_12M_Flag",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Indicates if the customer has been 30+ days past due in the last 6 months (1 for yes, 0 for no).",
+    "name": "RISK_MOB_6M_EVER_30PLUS_Flag",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Indicates if the customer has been 30+ days past due in the last 12 months (1 for yes, 0 for no).",
+    "name": "RISK_MOB_12M_EVER_30PLUS_Flag",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Indicates if the customer has been 90+ days past due in the last 12 months (1 for yes, 0 for no).",
+    "name": "RISK_MOB_12M_EVER_90PLUS_Flag",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Unique identifier for the loan agreement, typically an alphanumeric code.",
+    "name": "AGREEMENTNO",
+    "type": "STRING"
+  },
+  {
+    "description": "The unique numeric identifier for the agreement.",
+    "name": "AGREEMENTID",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Status of the loan at the start of month.",
+    "name": "SOM_STATUS",
+    "type": "STRING"
+  },
+  {
+    "description": "The number of days past due at the start of the month.",
+    "name": "SOM_DPD",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Indicates the DPD (Days Past Due) bucket of the customer as of the start of the current month. CRITICAL RULE: For analysis, you MUST use these exact buckets: '0', '1-2', '3-5', '6-10', and '11+'.",
+    "name": "SOM_DPD_BUCKET",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The EMI outstanding at the start of the month.",
+    "name": "SOM_EMIDEBTOR",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The book size at the start of the month.",
+    "name": "SOM_BOOKSIZE",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Start of Month Principal Outstanding - the outstanding loan amount at the start of the month.",
+    "name": "SOM_POS",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The outstanding overdue charges at the start of the month.",
+    "name": "SOM_ODCDEBTORS",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The cheque bounce charges outstanding at the start of the month.",
+    "name": "SOM_CBCDEBTORS",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The other charges outstanding at the start of the month.",
+    "name": "SOM_OTHERDEBTORS",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Excess money or credit balance at the start of the month.",
+    "name": "SOM_EXCESSMONEY",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The total charges due from the customer at the start of the month.",
+    "name": "SOM_TOTAL_CHARGES_DUE",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The total overdue amount at the start of the month.",
+    "name": "SOM_TOTAL_OD_AMT",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Start-of-Month Non-Performing Asset (NPA) stage. Indicates if the loan is regular, deceased, written-off, or sold (WO_SALE).",
+    "name": "SOM_NPASTAGEID",
+    "type": "STRING"
+  },
+  {
+    "description": "The principal outstanding at the start of the month.",
+    "name": "SOM_PRINCIPALDEBTOR",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The interest outstanding at the start of the month.",
+    "name": "SOM_INTERESTDEBTOR",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Indicates if the customer is currently delinquent at the start of the month ('Y'/'N').",
+    "name": "SOM_DELIQUENT_FLAG",
+    "type": "STRING"
+  },
+  {
+    "description": "Unique identifier for the branch where the loan was originated.",
+    "name": "BRANCHID",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Name of the branch where the loan was originated.",
+    "name": "BRANCHNAME",
+    "type": "STRING"
+  },
+  {
+    "description": "The total amount financed, including principal and possibly other capitalized fees.",
+    "name": "AMOUNTFINANCE",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Geographical region where the branch is located.",
+    "name": "REGION",
+    "type": "STRING"
+  },
+  {
+    "description": "The approved amount to be disbursed for the loan.",
+    "name": "DISBURSALAMOUNT",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The actual amount that was disbursed to the borrower.",
+    "name": "DISBURSEDAMOUNT",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The date when the loan amount was disbursed.",
+    "name": "DISBURSALDATE",
+    "type": "DATE"
+  },
+  {
+    "description": "The scheduled date when the loan will be fully paid off.",
+    "name": "MATURITYDATE",
+    "type": "DATE"
+  },
+  {
+    "description": "Indicates if the loan has matured ('Y'/'N').",
+    "name": "MATURITY_FLAG",
+    "type": "STRING"
+  },
+  {
+    "description": "The unique identifier for the product.",
+    "name": "PRODUCTID",
+    "type": "STRING"
+  },
+  {
+    "description": "Name of the loan product offered to the customer.",
+    "name": "PRODUCTNAME",
+    "type": "STRING"
+  },
+  {
+    "description": "Name of the two-wheeler manufacturer.",
+    "name": "MANUFACTURERNAME",
+    "type": "STRING"
+  },
+  {
+    "description": "BMS (Business Mobilization Scheme) amount associated with the loan.",
+    "name": "BMS_AMOUNT",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Allocated amount for a specific purpose.",
+    "name": "ALLOCATED_AMT",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The current month on book calculated from the disbursal date.",
+    "name": "MOB_ON_DISB_DT",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Loan-to-Value ratio, representing the loan amount as a percentage of the asset's value.",
+    "name": "LTV",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The effective interest rate of the loan.",
+    "name": "EFFRATE",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The state of the customer.",
+    "name": "STATE",
+    "type": "STRING"
+  },
+  {
+    "description": "The zone of the customer's location.",
+    "name": "ZONE",
+    "type": "STRING"
+  },
+  {
+    "description": "Name of the dealer or supplier from whom the vehicle was purchased.",
+    "name": "SUPPLIERNAME",
+    "type": "STRING"
+  },
+  {
+    "description": "The duration of the loan in months.",
+    "name": "TENURE",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The total cost of the asset financed.",
+    "name": "ASSETCOST",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Model name of the two-wheeler being financed.",
+    "name": "ASSETNAME",
+    "type": "STRING"
+  },
+  {
+    "description": "The make of the asset financed.",
+    "name": "ASSETMAKE",
+    "type": "STRING"
+  },
+  {
+    "description": "Main Strategic Business Unit responsible for this loan product.",
+    "name": "MAINSBU",
+    "type": "STRING"
+  },
+  {
+    "description": "Indicates if the customer has registered for giving RC of the vehicle ('Y'/'N').",
+    "name": "RC_FLAG",
+    "type": "STRING"
+  },
+  {
+    "description": "Indicates if the customer is currently delinquent ('Y'/'N').",
+    "name": "DELIQUENT_FLAG",
+    "type": "STRING"
+  },
+  {
+    "description": "The EMI outstanding for debtors.",
+    "name": "EMIDEBTOR",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Current Date Non-Performing Asset (NPA) stage. Indicates if the loan is regular, deceased, written-off, or sold (WO_SALE).",
+    "name": "NPASTAGEID",
+    "type": "STRING"
+  },
+  {
+    "description": "Principal Outstanding - the current remaining principal balance on the loan.",
+    "name": "POS",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The outstanding overdue charges for debtors.",
+    "name": "ODCDEBTORS",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The cheque bounce charges outstanding for debtors.",
+    "name": "CBCDEBTORS",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Excess money or credit balance for the account.",
+    "name": "EXCESSMONEY",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The book size.",
+    "name": "BOOKSIZE",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The other charges outstanding for debtors.",
+    "name": "OTHERDEBTORS",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The total charges due from the customer.",
+    "name": "TOTAL_CHARGES_DUE",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The principal outstanding.",
+    "name": "PRINCIPALDEBTOR",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The interest outstanding.",
+    "name": "INTERESTDEBTOR",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The total overdue amount.",
+    "name": "TOTAL_OD_AMT",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The unique identifier for the source system.",
+    "name": "SOURCESYSTEMID",
+    "type": "INTEGER"
+  },
+  {
+    "description": "The date an installment is due.",
+    "name": "DUEDATE",
+    "type": "DATE"
+  },
+  {
+    "description": "The equated monthly installment amount.",
+    "name": "EMI",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The unique identifier for the supplier.",
+    "name": "SUPPLIERID",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The name of the scheme.",
+    "name": "SCHEMENAME",
+    "type": "STRING"
+  },
+  {
+    "description": "The zipcode of the customer.",
+    "name": "ZIPCODE",
+    "type": "STRING"
+  },
+  {
+    "description": "The address of the customer.",
+    "name": "ADDRESS",
+    "type": "STRING"
+  },
+  {
+    "description": "The mobile number of the customer.",
+    "name": "MOBILE",
+    "type": "STRING"
+  },
+  {
+    "description": "The date of the first EMI.",
+    "name": "FIRST_EMI_DATE",
+    "type": "DATE"
+  },
+  {
+    "description": "The amount of the installment.",
+    "name": "INSTLAMT",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The installment number.",
+    "name": "INSTLNUM",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The principal component of the installment.",
+    "name": "PRINCOMP",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The interest component of the installment.",
+    "name": "INTCOMP",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The total amount to be billed in the future.",
+    "name": "FUTURE_BILLED_AMT",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The principal component of the amount to be billed in the future.",
+    "name": "FUTURE_BILLED_PRINCOMP",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The interest component of the amount to be billed in the future.",
+    "name": "FUTURE_BILLED_INTCOMP",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The number of EMIs paid by the customer.",
+    "name": "NO_OF_EMI_PAID",
+    "type": "INTEGER"
+  },
+  {
+    "description": "The number of EMIs due.",
+    "name": "NO_EMI_DUE",
+    "type": "INTEGER"
+  },
+  {
+    "description": "The total number of EMIs for the loan.",
+    "name": "TOTAL_NO_OF_EMI",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Transaction advice ID.",
+    "name": "TXNADVICEID",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The amount billed to the customer at the start of the month.",
+    "name": "SOM_BILLED_AMT",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The principal component at the start of the month.",
+    "name": "SOM_PRINCOMP",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The interest component at the start of the month.",
+    "name": "SOM_INTCOMP",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The total amount billed to the customer.",
+    "name": "TOTAL_BILLED_AMT",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The amount of EMI paid till date.",
+    "name": "PAID_EMI_TILL_DATE_AMT",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The month on book on the EMI date.",
+    "name": "MOB_ON_EMI_DATE",
+    "type": "INTEGER"
+  },
+  {
+    "description": "The pool of customers billed for the first time.",
+    "name": "FTM_BILLED_POOL",
+    "type": "STRING"
+  },
+  {
+    "description": "The name of the co-applicant.",
+    "name": "COAPPLICANT_NAME",
+    "type": "STRING"
+  },
+  {
+    "description": "The mobile number of the co-applicant.",
+    "name": "COAPPLICANT_MOBILE",
+    "type": "STRING"
+  },
+  {
+    "description": "The primary address of the customer.",
+    "name": "PRIMARY_ADDRESS",
+    "type": "STRING"
+  },
+  {
+    "description": "The primary contact number of the customer.",
+    "name": "PRIMARY_CONTACT_NUMBER",
+    "type": "STRING"
+  },
+  {
+    "description": "The current status of the loan.",
+    "name": "STATUS",
+    "type": "STRING"
+  },
+  {
+    "description": "The current number of days past due.",
+    "name": "DPD",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The current Days Past Due (DPD) bucket. CRITICAL RULE: For analysis, you MUST use these exact buckets: '0', '1-2', '3-5', '6-10', and '11+'.",
+    "name": "DPD_BUCKET",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The occupation of the customer.",
+    "name": "OCCUPATION",
+    "type": "STRING"
+  },
+  {
+    "description": "The gender of the customer.",
+    "name": "GENDER",
+    "type": "STRING"
+  },
+  {
+    "description": "The city of the customer.",
+    "name": "CITY",
+    "type": "STRING"
+  },
+  {
+    "description": "The name of the customer.",
+    "name": "CUSTOMERNAME",
+    "type": "STRING"
+  },
+  {
+    "description": "The unique identifier for the customer.",
+    "name": "CUSTOMERID",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The unique customer identifier.",
+    "name": "UCID",
+    "type": "STRING"
+  },
+  {
+    "description": "The zipcode of the primary address.",
+    "name": "PRIMARY_ADDRESS_ZIPCODE",
+    "type": "STRING"
+  },
+  {
+    "description": "The type of mandate for auto-debit.",
+    "name": "MANDATE_TYPE",
+    "type": "STRING"
+  },
+  {
+    "description": "The status of the mandate for auto-debit.",
+    "name": "MANDATE_STATUS",
+    "type": "STRING"
+  },
+  {
+    "description": "Flag indicating if the asset has been repossessed ('Y'/'N').",
+    "name": "REPO_FLAG",
+    "type": "STRING"
+  },
+  {
+    "description": "The bank account number.",
+    "name": "BANK_ACCOUNT_NUMBER",
+    "type": "STRING"
+  },
+  {
+    "description": "The Indian Financial System Code of the bank branch.",
+    "name": "IFSC_CODE",
+    "type": "STRING"
+  },
+  {
+    "description": "The unique mandate reference number.",
+    "name": "UMRN_NO",
+    "type":"STRING"
+  },
+  {
+    "description": "The amount received from the customer.",
+    "name": "RECDAMT",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The name of the account holder.",
+    "name": "ACCOUNT_HOLDER_NAME",
+    "type": "STRING"
+  },
+  {
+    "description": "The name of the first reference.",
+    "name": "REFERENCE_NAME_1",
+    "type": "STRING"
+  },
+  {
+    "description": "The mobile number of the first reference.",
+    "name": "REFERENCE_MOBILE_1",
+    "type": "STRING"
+  },
+  {
+    "description": "The name of the second reference.",
+    "name": "REFERENCE_NAME_2",
+    "type": "STRING"
+  },
+  {
+    "description": "The mobile number of the second reference.",
+    "name": "REFERENCE_MOBILE_2",
+    "type": "STRING"
+  },
+  {
+    "description": "The name of the bank account.",
+    "name": "BANK_ACCOUNT_NAME",
+    "type": "STRING"
+  },
+  {
+    "description": "The name of the nominee.",
+    "name": "NOMINEE_NAME",
+    "type": "STRING"
+  },
+  {
+    "description": "The mobile number of the nominee.",
+    "name": "NOMINEE_MOBILE_NO",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Flag indicating if the loan has been foreclosed ('Y'/'N').",
+    "name": "FORECLOSE_FLAG",
+    "type": "STRING"
+  },
+  {
+    "description": "The date the loan was authorized.",
+    "name": "AUTHORIZEDON",
+    "type": "DATE"
+  },
+  {
+    "description": "Indicates whether a loan matured without any delinquency ('Y'/'N').",
+    "name": "NON_DELINQUENTMATURED_FLAG",
+    "type": "STRING"
+  },
+  {
+    "description": "The amount of overdue charges collected.",
+    "name": "ODC_COLLECTION",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The amount of cheque bounce charges collected.",
+    "name": "CBC_COLLECTION",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The amount of EMI collected.",
+    "name": "EMI_COLLECTION",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The amount of excess money collected.",
+    "name": "EXCESSMONEY_COLLECTION",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The amount of the cheque.",
+    "name": "CHEQUE_AMT",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The date of the payment.",
+    "name": "PAYMENT_DATE",
+    "type": "DATE"
+  },
+  {
+    "description": "The date the cheque was sent.",
+    "name": "CHEQUESENTDATE",
+    "type": "DATE"
+  },
+  {
+    "description": "The date the receipt was generated.",
+    "name": "RECEIPT_DATE",
+    "type": "DATE"
+  },
+  {
+    "description": "The amount of cheque bounce charges collected.",
+    "name": "CBC_CHARGES_COLLECTION",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The amount of late payment penalty charges collected.",
+    "name": "LPP_CHARGES_COLLECTION",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The month-to-date bounce count.",
+    "name": "MTD_BOUNCE_COUNT",
+    "type": "INTEGER"
+  },
+  {
+    "description": "The date of the bounce.",
+    "name": "BOUNCE_DATE",
+    "type": "DATE"
+  },
+  {
+    "description": "The allocation status.",
+    "name": "ALLOCATION",
+    "type": "STRING"
+  },
+  {
+    "description": "The center name.",
+    "name": "CENTER",
+    "type": "STRING"
+  },
+  {
+    "description": "Calling reference.",
+    "name": "CALLING_PKP_REF",
+    "type": "STRING"
+  },
+  {
+    "description": "Tele-caller PS ID.",
+    "name": "TC_PS_ID",
+    "type": "STRING"
+  },
+  {
+    "description": "Tele-caller name.",
+    "name": "TC_NAME",
+    "type": "STRING"
+  },
+  {
+    "description": "Team lead PS ID.",
+    "name": "TL_PS_ID",
+    "type": "STRING"
+  },
+  {
+    "description": "Team lead name.",
+    "name": "TL_NAME",
+    "type": "STRING"
+  },
+  {
+    "description": "Supervisor ID.",
+    "name": "SUPERVISOR_ID",
+    "type": "STRING"
+  },
+  {
+    "description": "Supervisor name.",
+    "name": "SUPERVISOR_NAME",
+    "type": "STRING"
+  },
+  {
+    "description": "Agency manager PS number.",
+    "name": "AGENCY_MANAGER_PSNO_TMPSNO",
+    "type": "STRING"
+  },
+  {
+    "description": "Agency manager name.",
+    "name": "AGENCY_MANAGER_NAME_TM_NAME",
+    "type": "STRING"
+  },
+  {
+    "description": "Regional collection manager PS number.",
+    "name": "RCM_PS_NO",
+    "type": "STRING"
+  },
+  {
+    "description": "Regional collection manager name.",
+    "name": "RCM_NAME",
+    "type": "STRING"
+  },
+  {
+    "description": "Zonal collection manager PS.",
+    "name": "ZCM_PS",
+    "type": "STRING"
+  },
+  {
+    "description": "Zonal area manager name.",
+    "name": "ZAM_NAME",
+    "type": "STRING"
+  },
+  {
+    "description": "Agency name.",
+    "name": "AGENCY_NAME",
+    "type": "STRING"
+  },
+  {
+    "description": "Agency ID.",
+    "name": "AGENCY_ID",
+    "type": "STRING"
+  },
+  {
+    "description": "CCFC.",
+    "name": "CCFC",
+    "type": "STRING"
+  },
+  {
+    "description": "Bucket group.",
+    "name": "BKTGRP",
+    "type": "STRING"
+  },
+  {
+    "description": "Bucket group 2.",
+    "name": "BKTGRP2",
+    "type": "STRING"
+  },
+  {
+    "description": "Branch name.",
+    "name": "BRANCH",
+    "type": "STRING"
+  },
+  {
+    "description": "Zonal collection manager.",
+    "name": "ZCM",
+    "type": "STRING"
+  },
+  {
+    "description": "Regional collection manager.",
+    "name": "RCM",
+    "type": "STRING"
+  },
+  {
+    "description": "Area collection manager.",
+    "name": "ACM",
+    "type": "STRING"
+  },
+  {
+    "description": "Final head.",
+    "name": "FINALHEAD",
+    "type": "STRING"
+  },
+  {
+    "description": "The date of the collection.",
+    "name": "COLLECTION_DATE",
+    "type": "DATE"
+  },
+  {
+    "description": "The amount collected from the customer.",
+    "name": "COLLECTION_AMT",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Gross Non-Starter for 1st EMI ('Y'/'N'). CRITICAL RULE: This is only valid for accounts in their 1st month. Any calculation MUST be filtered for MOB_ON_INSTL_START_DATE = 1.",
+    "name": "GNS1",
+    "type": "STRING"
+  },
+  {
+    "description": "Net Non-Starter for 1st EMI ('Y'/'N'). CRITICAL RULE: This is only valid for accounts in their 1st month. Any calculation MUST be filtered for MOB_ON_INSTL_START_DATE = 1.",
+    "name": "NNS1",
+    "type": "STRING"
+  },
+  {
+    "description": "Gross Non-Starter for 2nd EMI ('Y'/'N'). CRITICAL RULE: This is only valid for accounts in their 2nd month. Any calculation MUST be filtered for MOB_ON_INSTL_START_DATE = 2.",
+    "name": "GNS2",
+    "type": "STRING"
+  },
+  {
+    "description": "Net Non-Starter for 2nd EMI ('Y'/'N'). CRITICAL RULE: This is only valid for accounts in their 2nd month. Any calculation MUST be filtered for MOB_ON_INSTL_START_DATE = 2.",
+    "name": "NNS2",
+    "type": "STRING"
+  },
+  {
+    "description": "Gross Non-Starter for 3rd EMI ('Y'/'N'). CRITICAL RULE: This is only valid for accounts in their 3rd month. Any calculation MUST be filtered for MOB_ON_INSTL_START_DATE = 3.",
+    "name": "GNS3",
+    "type": "STRING"
+  },
+  {
+    "description": "Net Non-Starter for 3rd EMI ('Y'/'N'). CRITICAL RULE: This is only valid for accounts in their 3rd month. Any calculation MUST be filtered for MOB_ON_INSTL_START_DATE = 3.",
+    "name": "NNS3",
+    "type": "STRING"
+  },
+  {
+    "description": "Gross Non-Starter for 4th EMI ('Y'/'N'). CRITICAL RULE: This is only valid for accounts in their 4th month. Any calculation MUST be filtered for MOB_ON_INSTL_START_DATE = 4.",
+    "name": "GNS4",
+    "type": "STRING"
+  },
+  {
+    "description": "Net Non-Starter for 4th EMI ('Y'/'N'). CRITICAL RULE: This is only valid for accounts in their 4th month. Any calculation MUST be filtered for MOB_ON_INSTL_START_DATE = 4.",
+    "name": "NNS4",
+    "type": "STRING"
+  },
+  {
+    "description": "Gross Non-Starter for 5th EMI ('Y'/'N'). CRITICAL RULE: This is only valid for accounts in their 5th month. Any calculation MUST be filtered for MOB_ON_INSTL_START_DATE = 5.",
+    "name": "GNS5",
+    "type": "STRING"
+  },
+  {
+    "description": "Net Non-Starter for 5th EMI ('Y'/'N'). CRITICAL RULE: This is only valid for accounts in their 5th month. Any calculation MUST be filtered for MOB_ON_INSTL_START_DATE = 5.",
+    "name": "NNS5",
+    "type": "STRING"
+  },
+  {
+    "description": "Gross Non-Starter for 6th EMI ('Y'/'N'). CRITICAL RULE: This is only valid for accounts in their 6th month. Any calculation MUST be filtered for MOB_ON_INSTL_START_DATE = 6.",
+    "name": "GNS6",
+    "type": "STRING"
+  },
+  {
+    "description": "Net Non-Starter for 6th EMI ('Y'/'N'). CRITICAL RULE: This is only valid for accounts in their 6th month. Any calculation MUST be filtered for MOB_ON_INSTL_START_DATE = 6.",
+    "name": "NNS6",
+    "type": "STRING"
+  },
+  {
+    "description": "The status of the loan clearance.",
+    "name": "CLEARANCE_STATUS",
+    "type": "STRING"
+  },
+  {
+    "description": "Indicates if EMI was cleared on or before the due date.",
+    "name": "EMI_CLEAR_ON_OR_BEFORE_DUE_DATE",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The specific sub-product associated with the loan.",
+    "name": "SUB_PRODUCT",
+    "type": "STRING"
+  },
+  {
+    "description": "Final month on book status.",
+    "name": "FINALMOB",
+    "type": "STRING"
+  },
+  {
+    "description": "The status of the loan payment for the current month.",
+    "name": "PAID_STATUS",
+    "type": "STRING"
+  },
+  {
+    "description": "Indicates the movement of the account from one delinquency bucket to another.",
+    "name": "ROLL_RATES_FINAL",
+    "type": "STRING"
+  },
+  {
+    "description": "The amount of the payment.",
+    "name": "PAYMENT_AMOUNT",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Categorization of the loan based on delinquency in respect to regular, high, or x bucket pools.",
+    "name": "BUCKET_CATEGORIZATION",
+    "type": "STRING"
+  },
+  {
+    "description": "The total charge collection for the current month.",
+    "name": "TOTAL_CHARGE_COLLECTION",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The status of the charge collection.",
+    "name": "CHARGE_COLLECTION_STATUS",
+    "type": "STRING"
+  },
+  {
+    "description": "Indicates if charges are collected ('Y'/'N').",
+    "name": "CHARGE_COLLECTION_FLAG",
+    "type": "STRING"
+  },
+  {
+    "description": "The operational date for which the data is relevant. This is the primary date field for filtering time-series data.",
+    "name": "BUSINESS_DATE",
+    "type": "DATE"
+  },
+  {
+    "description": "Indicates if the customer is in the X bucket ('Y'/'N').",
+    "name": "XBKT_FLAG",
+    "type": "STRING"
+  },
+  {
+    "description": "Indicates if the customer has zero days past due in the current month ('Y'/'N').",
+    "name": "ZERODPD_FLAG",
+    "type": "STRING"
+  },
+  {
+    "description": "Indicator if the borrower is considered a prime customer (better credit quality, 'Y'/'N').",
+    "name": "PrimeFlag",
+    "type": "STRING"
+  },
+  {
+    "description": "Indicates if the payment has bounced for the current month ('Y'/'N').",
+    "name": "Bounce_Flag",
+    "type": "STRING"
+  },
+  {
+    "description": "Indicates if the customer has been billed month-to-date ('Y'/'N').",
+    "name": "MTD_Billed_Flag",
+    "type": "STRING"
+  },
+  {
+    "description": "The date of the installment start.",
+    "name": "InstalStartDate",
+    "type": "DATE"
+  },
+  {
+    "description": "The final amount collected from the customer.",
+    "name": "Final_COLLECTION_AMOUNT",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Categorization of the customer's paid and unpaid status for the operational date. Typical values include 'PAID', 'UNPAID'.",
+    "name": "PAID_UNPAID_STATUS",
+    "type": "STRING"
+  },
+  {
+    "description": "Agreement number for allocation purposes.",
+    "name": "Alloc_AgreementNo",
+    "type": "STRING"
+  },
+  {
+    "description": "Product for allocation purposes.",
+    "name": "Alloc_PRODUCT",
+    "type": "STRING"
+  },
+  {
+    "description": "CCFC for allocation purposes.",
+    "name": "Alloc_CCFC",
+    "type": "STRING"
+  },
+  {
+    "description": "Allocation status.",
+    "name": "Alloc_Allocation",
+    "type": "STRING"
+  },
+  {
+    "description": "Current allocation status.",
+    "name": "Alloc_Current_Allocation",
+    "type": "STRING"
+  },
+  {
+    "description": "Primary allocation status.",
+    "name": "Alloc_Primary_Allocation",
+    "type": "STRING"
+  },
+  {
+    "description": "Reference date for allocation.",
+    "name": "Alloc_REF_Date",
+    "type": "STRING"
+  },
+  {
+    "description": "Calling reference for allocation.",
+    "name": "Alloc_Calling_PKP_REF",
+    "type": "STRING"
+  },
+  {
+    "description": "Tele-caller PS ID for allocation.",
+    "name": "Alloc_TC_PS_ID",
+    "type": "STRING"
+
+  },
+  {
+    "description": "Tele-caller name for allocation.",
+    "name": "Alloc_TC_Name",
+    "type": "STRING"
+  },
+  {
+    "description": "Team lead PS ID for allocation.",
+    "name": "Alloc_TL_PS_ID",
+    "type": "STRING"
+
+  },
+  {
+    "description": "Team lead name for allocation.",
+    "name": "Alloc_TL_Name",
+    "type": "STRING"
+  },
+  {
+    "description": "Supervisor ID for allocation.",
+    "name": "Alloc_Supervisor_ID",
+    "type": "STRING"
+  },
+  {
+    "description": "Supervisor name for allocation.",
+    "name": "Alloc_Supervisor_Name",
+    "type": "STRING"
+  },
+  {
+    "description": "Agency manager PS number for allocation.",
+    "name": "Alloc_AgencyManagerPSNo_TMPSNO",
+    "type": "STRING"
+  },
+  {
+    "description": "Agency manager name for allocation.",
+    "name": "Alloc_Agency_Manager_Name_TM_NAME",
+    "type": "STRING"
+  },
+  {
+    "description": "Regional collection manager PS number for allocation.",
+    "name": "Alloc_RCM_PS_NO",
+    "type": "STRING"
+  },
+  {
+    "description": "Regional collection manager name for allocation.",
+    "name": "Alloc_RCM_NAME",
+    "type": "STRING"
+  },
+  {
+    "description": "Zonal collection manager PS for allocation.",
+    "name": "Alloc_ZCM_PS",
+    "type": "STRING"
+  },
+  {
+    "description": "Zonal area manager name for allocation.",
+    "name": "Alloc_ZAM_NAME",
+    "type": "STRING"
+  },
+  {
+    "description": "Agency name for allocation.",
+    "name": "Alloc_AgencyName",
+    "type": "STRING"
+  },
+  {
+    "description": "Agency ID for allocation.",
+    "name": "Alloc_AgencyID",
+    "type": "STRING"
+  },
+  {
+    "description": "National collection manager PS ID for allocation.",
+    "name": "Alloc_NCM_PS_ID",
+    "type": "STRING"
+
+  },
+  {
+    "description": "National collection manager name for allocation.",
+    "name": "Alloc_NCM_Name",
+    "type": "STRING"
+  },
+  {
+    "description": "Segmentation P1/P2/P3 for allocation.",
+    "name": "Alloc_Segmentation_P1P2P3",
+    "type": "STRING"
+  },
+  {
+    "description": "Identifies a Net Non-Starter (NNS), where a customer fails to pay their first EMI ('Y'/'N'). CRITICAL RULE: Any calculation using this FMI_NNS column (count, percentage, etc.) MUST be filtered for accounts where MOB_ON_INSTL_START_DATE = 1.",
+    "name": "FMI_NNS",
+    "type": "STRING"
+  },
+  {
+    "description": "Identifier to determine if the customer has not paid the second EMI ('Y'/'N'). CRITICAL RULE: Any calculation using this column MUST be filtered for accounts where MOB_ON_INSTL_START_DATE = 2.",
+    "name": "SMI_NNS",
+    "type": "STRING"
+  },
+  {
+    "description": "Identifier to determine if the customer has not paid the third EMI ('Y'/'N'). CRITICAL RULE: Any calculation using this column MUST be filtered for accounts where MOB_ON_INSTL_START_DATE = 3.",
+    "name": "TMI_NNS3",
+    "type": "STRING"
+  },
+  {
+    "description": "Identifies if a customer bounced on their first EMI ('Y'/'N'). CRITICAL RULE: Any calculation involving GNS (count, percentage, etc.) MUST be filtered for accounts where MOB_ON_INSTL_START_DATE = 1. This column is ONLY valid for first EMI cases.",
+    "name": "FMI_GNS",
+    "type": "STRING"
+  },
+  {
+    "description": "Identifier to determine if the customer has bounced in the second EMI ('Y'/'N'). CRITICAL RULE: Any calculation using this column MUST be filtered for accounts where MOB_ON_INSTL_START_DATE = 2.",
+    "name": "SMI_GNS",
+    "type": "STRING"
+  },
+  {
+    "description": "Identifier to determine if the customer has bounced in the third EMI ('Y'/'N'). CRITICAL RULE: Any calculation using this column MUST be filtered for accounts where MOB_ON_INSTL_START_DATE = 3.",
+    "name": "TMI_GNS3",
+    "type": "STRING"
+  },
+  {
+    "description": "Indicates if the customer is currently 0 days past due (1 for yes, 0 for no).",
+    "name": "Delinquency_0_Flag",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Indicates if the customer is currently 30 days past due (1 for yes, 0 for no).",
+    "name": "Delinquency_30_Flag",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Indicates if the customer is currently 60 days past due (1 for yes, 0 for no).",
+    "name": "Delinquency_60_Flag",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Indicates if the customer is currently 90 days past due (1 for yes, 0 for no).",
+    "name": "Delinquency_90_Flag",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Indicates if the customer was 0 days past due last year (1 for yes, 0 for no).",
+    "name": "Delinquency_0_LY_Flag",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Indicates if the customer was 30 days past due last year (1 for yes, 0 for no).",
+    "name": "Delinquency_30_LY_Flag",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Indicates if the customer was 60 days past due last year (1 for yes, 0 for no).",
+    "name": "Delinquency_60_LY_Flag",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Indicates if the customer was 90 days past due last year (1 for yes, 0 for no).",
+    "name": "Delinquency_90_LY_Flag",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Indicates if the customer has slipped from 0+ days past due to 1 year.",
+    "name": "Delinquency_0_PLUS_1YEAR_SLIPPAGE_Flag",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Indicates if the customer has slipped from 30+ days past due to 1 year.",
+    "name": "Delinquency_30_PLUS_1YEAR_SLIPPAGE_Flag",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Indicates if the customer has slipped from 60+ days past due to 1 year.",
+    "name": "Delinquency_60_PLUS_1YEAR_SLIPPAGE_Flag",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Indicates if the customer has slipped from 90+ days past due to 1 year.",
+    "name": "Delinquency_90_PLUS_1YEAR_SLIPPAGE_Flag",
+    "type": "INTEGER"
+  },
+  {
+    "description": "The expiry date of the settlement.",
+    "name": "SETTLEMENT_EXPIRY_DATE",
+    "type": "DATETIME"
+  },
+  {
+    "description": "Current late payment interest.",
+    "name": "CURRLPI",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Current month's interest.",
+    "name": "CURRMNTHINT",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Cheque bounce charges amount.",
+    "name": "CBC_AMT",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Overdue charges amount.",
+    "name": "ODC_AMT",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Outstanding amount.",
+    "name": "OS_AMT",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Delayed interest.",
+    "name": "DEL_INT",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Other amount.",
+    "name": "OTHER_AMT",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Excess amount before settlement.",
+    "name": "EXCES_AMT_BFR_SET",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Amount received post settlement.",
+    "name": "AMT_RECD_POST_SET",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Final principal outstanding.",
+    "name": "FPOS",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Categorization of customer's location. CRITICAL RULE: When reporting by TIER, you MUST use these exact group names: 'Tier 1' (for METRO), 'Tier 2' (for URBAN and SEMI_URBAN), and 'Tier 3' (for RURAL).",
+    "name": "TIER",
+    "type": "STRING"
+  },
+  {
+    "description": "The unique identifier for the field sales executive.",
+    "name": "FLSID",
+    "type": "STRING"
+  },
+  {
+    "description": "The name of the field sales executive.",
+    "name": "FLSNAME",
+    "type": "STRING"
+  },
+  {
+    "description": "The date the asset was marked for repossession.",
+    "name": "REPO_MARKING_DATE",
+    "type": "DATE"
+  },
+  {
+    "description": "Indicates if the customer has been 90+ days past due in the last 6 months.",
+    "name": "MOB6_DPD90PL_RC_N",
+    "type": "STRING"
+  },
+  {
+    "description": "Indicates if the customer has been 30+ days past due in the last 3 months.",
+    "name": "MOB3_DPD30PL_RC_N",
+    "type": "STRING"
+  },
+  {
+    "description": "FLS performance indicator.",
+    "name": "FLS_GTNNS420PERC_DUEGT3_NNS4GT2_NNS0001",
+    "type": "INTEGER"
+  },
+  {
+    "description": "FLS digital performance indicator.",
+    "name": "FLS_DIGILT20PERC_GNS1GT30PER_DUEGT6_GNSGT3",
+    "type": "INTEGER"
+  },
+  {
+    "description": "The risk bucket from the Early Warning System model.",
+    "name": "EWS_Risk_Bucket",
+    "type": "STRING"
+  }
+]
