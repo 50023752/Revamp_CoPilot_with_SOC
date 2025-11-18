@@ -1,0 +1,21 @@
+# Streamlit configuration for Google Cloud Shell
+# This file must be in .streamlit/config.toml
+
+[server]
+# Enable CORS for Cloud Shell
+enableCORS = false
+enableXsrfProtection = false
+
+# Listen on all interfaces
+headless = true
+address = "0.0.0.0"
+port = 8501
+
+# WebSocket configuration for Cloud Shell proxy
+enableWebsocketCompression = false
+
+[browser]
+# Don't try to open browser automatically
+gatherUsageStats = false
+serverAddress = "0.0.0.0"
+serverPort = 8501
