@@ -115,13 +115,22 @@ async def run_agent_query_async(user_question: str, session_id: str):
     from google.adk.sessions import Session
     from google.genai.types import Content, Part
 
-    # 1. Get/Create Session
-    # Check if session exists, if yes reuse it, else create new one
+    # 1. Get/Create Session with robust error handling
     session = None
+    
+    # Try to reuse existing session
     if hasattr(session_service, '_sessions') and session_id in session_service._sessions:
-        session = session_service._sessions[session_id]
-        logger.info(f"Reusing existing session: {session_id}")
-    else:
+        try:
+            session = session_service._sessions[session_id]
+            logger.info(f"Reusing existing session: {session_id}")
+        except Exception as e:
+            logger.warning(f"Failed to reuse session {session_id}: {e}")
+            # Clear corrupted session
+            if hasattr(session_service, '_sessions'):
+                session_service._sessions.pop(session_id, None)
+    
+    # Create new session if reuse failed
+    if session is None:
         try:
             session = await session_service.create_session(
                 session_id=session_id,
@@ -131,12 +140,19 @@ async def run_agent_query_async(user_question: str, session_id: str):
             logger.info(f"Created new session: {session_id}")
         except Exception as e:
             if "already exists" in str(e).lower():
-                # Race condition - session was just created, retrieve it
-                if hasattr(session_service, '_sessions') and session_id in session_service._sessions:
-                    session = session_service._sessions[session_id]
-                    logger.info(f"Retrieved race-created session: {session_id}")
-                else:
-                    raise ValueError(f"Session {session_id} exists but unreachable")
+                # Session exists but unreachable - force cleanup and use new ID
+                logger.warning(f"Session {session_id} corrupted, creating fresh session")
+                if hasattr(session_service, '_sessions'):
+                    session_service._sessions.pop(session_id, None)
+                
+                # Generate new session ID and update Streamlit state
+                new_session_id = str(uuid.uuid4())
+                session = await session_service.create_session(
+                    session_id=new_session_id,
+                    app_name="streamlit-copilot",
+                    user_id="streamlit-user"
+                )
+                logger.info(f"Created fresh session: {new_session_id}")
             else:
                 raise
 
