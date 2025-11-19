@@ -10,6 +10,8 @@ from datetime import datetime, timezone
 from typing import ClassVar, Optional, AsyncGenerator
 import uuid
 import re
+import tempfile
+import os
 
 # Standard ADK imports
 from google.adk.agents import BaseAgent, LlmAgent
@@ -67,11 +69,12 @@ This schema is grouped by business purpose. Read carefully.
 
 ### 2. DPD Buckets MUST Use Exact Values
 When filtering by SOM_DPD_BUCKET or DPD_BUCKET, ALWAYS use these EXACT values:
-- '0' for current
-- '1-2' for 1-2 DPD
-- '3-5' for 3-5 DPD
-- '6-10' for 6-10 DPD
-- '11+' for 11+ DPD
+- '0' for 0 dpd
+- '1' for 1-30 DPD
+- '2' for 31-60 DPD
+- '3' for 61-90 DPD
+- '4' for 91-120 DPD
+- '5' for 121+ DPD
 
 ### 3. EWS Band Grouping
 When grouping EWS_Model_Output_Band values:
@@ -99,6 +102,8 @@ When using TIER field, convert to standard tiers:
 ## Output Format
 
 Generate ONLY the SQL query wrapped in ```sql ``` tags. No explanations before or after.
+DO NOT name columns starting with numbers or special characters.
+    DO NOT produce any acknowledgements, confirmations, or conversational text. If you understand, do NOT reply 'Okay' or 'I am ready'. Reply only with the SQL block.
 
 Example:
 Question: "What is the GNS1 count and percentage for last 3 months by branch?"
@@ -120,6 +125,27 @@ WHERE BUSINESS_DATE >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH)
 GROUP BY BRANCHNAME
 ORDER BY gns1_count DESC
 ```
+
+Question: "What is the 0+ dpd count and percentage for last 6 months?"
+Response:
+```sql
+SELECT
+  DATE_TRUNC(BUSINESS_DATE, MONTH) AS month,
+  COUNT(DISTINCT AGREEMENTNO) AS total_accounts,
+  COUNT(DISTINCT CASE WHEN SOM_DPD > 0 THEN AGREEMENTNO END) AS col_0_plus_dpd_accounts,
+  ROUND(SAFE_DIVIDE(COUNT(DISTINCT CASE WHEN SOM_DPD > 0 THEN AGREEMENTNO END), COUNT(DISTINCT AGREEMENTNO)) * 100, 2) AS col_0_plus_dpd_percentage
+FROM
+  `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_NOSTD_MART_HIST`
+WHERE
+  BUSINESS_DATE >= DATE_SUB(CURRENT_DATE(), INTERVAL 6 MONTH)
+  AND BUSINESS_DATE <= CURRENT_DATE()
+GROUP BY
+  month
+ORDER BY
+  month DESC;
+```
+
+
 """
     
     def __init__(self):
@@ -232,8 +258,30 @@ ORDER BY gns1_count DESC
         if "{SCHEMA_PLACEHOLDER}" in instr_text:
             instr_text = instr_text.replace("{SCHEMA_PLACEHOLDER}", schema_info)
 
-        enhanced_instruction = instr_text
+        # Add explicit user question and a brief last Q/A snippet (if available)
+        user_q = request.user_question if hasattr(request, 'user_question') else ''
+        last_qa = ''
+        try:
+            history = context.session.state.get('conversation_history', []) if context is not None and hasattr(context, 'session') else []
+            if history:
+                last = history[-1]
+                last_qa = f"Previous Q: {last.get('question', '')} -- Previous A: {last.get('answer', '')}"
+        except Exception:
+            last_qa = ''
+
+        enhanced_instruction = instr_text + "\n\n" + f"USER_QUESTION: {user_q}\nLAST_QA_SNIPPET: {last_qa}\n"
         self.sql_generator.instruction = enhanced_instruction
+        # Debug: persist the exact instruction sent (truncated in logs)
+        try:
+            instr_snippet = (enhanced_instruction[:2000] + '...') if len(enhanced_instruction) > 2000 else enhanced_instruction
+            logger.debug(f"Instruction sent to LLM (first 2000 chars): {instr_snippet}")
+            tmp_dir = tempfile.gettempdir()
+            instr_path = os.path.join(tmp_dir, f"llm_instruction_{uuid.uuid4().hex}.txt")
+            with open(instr_path, 'w', encoding='utf-8') as f:
+                f.write(enhanced_instruction)
+            logger.info(f"Full instruction saved to: {instr_path}")
+        except Exception:
+            logger.debug("Failed to save instruction to temp file")
         
         # 3. Invoke the Sub-Agent
         accumulated_text = ""
@@ -245,6 +293,25 @@ ORDER BY gns1_count DESC
                             accumulated_text += part.text
         except Exception as e:
             logger.error(f"Sub-agent execution failed: {e}")
+            # Save any partial LLM output for debugging
+            try:
+                tmp_dir = tempfile.gettempdir()
+                resp_path = os.path.join(tmp_dir, f"llm_response_partial_{uuid.uuid4().hex}.txt")
+                with open(resp_path, 'w', encoding='utf-8') as f:
+                    f.write(accumulated_text)
+                logger.info(f"Partial LLM response saved to: {resp_path}")
+                try:
+                    print('\n' + '='*40)
+                    print('PARTIAL LLM RESPONSE START')
+                    print('='*40)
+                    print(accumulated_text)
+                    print('='*40)
+                    print('PARTIAL LLM RESPONSE END')
+                    print('='*40 + '\n')
+                except Exception:
+                    logger.debug('Failed to print partial LLM response to stdout')
+            except Exception:
+                logger.debug("Failed to save partial LLM response")
             raise
         finally:
             # Restore original instruction
@@ -258,7 +325,39 @@ ORDER BY gns1_count DESC
                 logger.debug("Failed to clear SCHEMA_PLACEHOLDER from session state")
 
         # 4. Parse Result
-        return self._parse_and_validate(accumulated_text, request.user_question)
+        # Debug: save full raw LLM output for inspection before parsing
+        try:
+            tmp_dir = tempfile.gettempdir()
+            resp_path = os.path.join(tmp_dir, f"llm_response_full_{uuid.uuid4().hex}.txt")
+            with open(resp_path, 'w', encoding='utf-8') as f:
+                f.write(accumulated_text)
+            logger.info(f"Full LLM response saved to: {resp_path}")
+            if len(accumulated_text) > 2000:
+                logger.debug(f"Raw LLM response (first 2000 chars): {accumulated_text[:2000]}")
+                try:
+                    print('\n' + '='*80)
+                    print('RAW LLM RESPONSE START')
+                    print('='*80)
+                    print(accumulated_text)
+                    print('='*80)
+                    print('RAW LLM RESPONSE END')
+                    print('='*80 + '\n')
+                except Exception:
+                    logger.debug('Failed to print full LLM response to stdout')
+        except Exception:
+            logger.debug("Failed to save full LLM response to temp file")
+
+        parsed = self._parse_and_validate(accumulated_text, request.user_question)
+        # Post-parse check: ensure SQL starts with SELECT or WITH
+        sql_head = parsed.sql_query.strip()[:10].upper()
+        if not (sql_head.startswith('SELECT') or sql_head.startswith('WITH')):
+            logger.warning(f"Parsed SQL does not start with SELECT/WITH. Head: {sql_head}")
+            try:
+                logger.warning(f"Inspect LLM response: {resp_path}")
+            except Exception:
+                logger.warning("Please inspect the raw LLM response saved above to see why the model returned non-SQL text.")
+
+        return parsed
 
     def _extract_last_message(self, ctx: InvocationContext) -> str:
         """Helper to get the actual latest user query."""
@@ -268,12 +367,76 @@ ORDER BY gns1_count DESC
 
     def _parse_and_validate(self, llm_output: str, question: str) -> SQLGenerationResponse:
         """Logic to parse the LLM output into your structured response."""
-        # ... (Reuse your regex logic here) ...
+        # Prefer code-fenced SQL blocks. If not found, try to extract the
+        # first statement that starts with SELECT or WITH as a fallback.
         sql_match = re.search(r'```sql\s+(.*?)\s+```', llm_output, re.DOTALL | re.IGNORECASE)
-        sql_query = sql_match.group(1).strip() if sql_match else llm_output.replace("```sql", "").replace("```", "").strip()
+        if sql_match:
+            sql_query = sql_match.group(1).strip()
+        else:
+            # Remove common acknowledgment lines and try to find SQL lines
+            cleaned = llm_output.strip()
+            # Find first occurrence of a line starting with SELECT/WITH
+            lines = cleaned.splitlines()
+            start_idx = None
+            for i, line in enumerate(lines):
+                if re.match(r'^\s*(SELECT|WITH)\b', line, re.IGNORECASE):
+                    start_idx = i
+                    break
+
+            if start_idx is not None:
+                # Collect until a blank line or end
+                collected = []
+                for line in lines[start_idx:]:
+                    if line.strip() == '' and collected:
+                        break
+                    collected.append(line)
+                sql_query = "\n".join(collected).strip()
+            else:
+                # Last resort: strip any code fences and return what's left
+                sql_query = cleaned.replace("```sql", "").replace("```", "").strip()
         
+        # Post-process: sanitize common aliasing issues produced by LLMs
+        def _sanitize_aliases(sql: str) -> (str, bool):
+            changed = False
+
+            # 1) Convert `AS 'alias'` or `as 'alias'` to `AS `alias``
+            def _as_repl(m):
+                nonlocal changed
+                alias = m.group(1)
+                new_alias = alias
+                if alias and alias[0].isdigit():
+                    new_alias = f"col_{alias}"
+                changed = True
+                return f"AS `{new_alias}`"
+
+            sql, n1 = re.subn(r"\bAS\s+'([A-Za-z0-9_]+)'", _as_repl, sql, flags=re.IGNORECASE)
+            if n1:
+                changed = True
+
+            # 2) Convert trailing single-quoted aliases after expressions: e.g. `expr 'alias',` -> `expr AS `alias`,`
+            def _trail_repl(m):
+                nonlocal changed
+                expr = m.group('expr')
+                alias = m.group('alias')
+                suffix = m.group('suffix') or ''
+                new_alias = alias
+                if alias and alias[0].isdigit():
+                    new_alias = f"col_{alias}"
+                changed = True
+                return f"{expr} AS `{new_alias}`{suffix}"
+
+            sql, n2 = re.subn(r"(?P<expr>[^,\n]+?)\s+'(?P<alias>[A-Za-z0-9_]+)'(?P<suffix>\s*(,|\n|$))", _trail_repl, sql)
+            if n2:
+                changed = True
+
+            return sql, changed
+
+        sanitized_sql, modified = _sanitize_aliases(sql_query)
+        if modified:
+            logger.info("Sanitized SQL aliases produced by LLM to conform to BigQuery syntax")
+
         return SQLGenerationResponse(
-            sql_query=sql_query,
+            sql_query=sanitized_sql,
             metadata=QueryMetadata(
                 domain="COLLECTIONS",
                 intent=question,

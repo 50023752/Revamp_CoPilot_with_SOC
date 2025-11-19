@@ -1,224 +1,182 @@
-"""
-Streamlit Frontend for ADK V1 Application
-Integrates with OrchestratorAgent to provide a web interface for testing in Cloud Shell
-"""
-
+import streamlit as st
+import requests
 import os
+import ast
 import sys
-import json
 import asyncio
 import logging
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
+import uuid
+import json
+from dotenv import load_dotenv
+from google.cloud import bigquery
+import pandas as pd
+import io
+import plotly.express as px
+from utils import *
 
-import streamlit as st
 
-# Add project root to path
+# Load environment variables from .env file
+load_dotenv()
+
+# Ensure project root on path for local imports
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
-from google.adk.agents import AgentContext
-from google.adk.events import Event
-from google.adk.sessions import Session, InMemorySessionStore
-
-from agent import root_agent
-from config.settings import settings
-
-# Configure logging
+# Configure logging for frontend
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Google Cloud project configuration
+PROJECT_ID = os.environ.get("PROJECT_ID", "analytics-datapipeline-prod")
 
-# ---------------------- ADK Integration ----------------------
-
-async def run_agent_query(user_question: str, session_id: str):
-    """
-    Run the orchestrator agent with a user question
-    Returns: (response_text, domain_used)
-    """
-    try:
-        # Create session store and session
-        session_store = InMemorySessionStore()
-        session = Session(id=session_id)
-        
-        # Create agent context with the user message
-        ctx = AgentContext(
-            session=session,
-            new_message_text=user_question
-        )
-        
-        # Collect all events from the agent
-        response_parts = []
-        domain = None
-        
-        async for event in root_agent.run_async(ctx):
-            # Extract text from event content
-            if hasattr(event, 'content') and event.content:
-                if hasattr(event.content, 'parts'):
-                    for part in event.content.parts:
-                        if hasattr(part, 'text') and part.text:
-                            response_parts.append(part.text)
-                elif isinstance(event.content, str):
-                    response_parts.append(event.content)
-        
-        # Get the selected domain from session state
-        domain = ctx.session.state.get('selected_domain', 'Unknown')
-        
-        # Combine response parts
-        response_text = "\n".join(response_parts) if response_parts else "No response received."
-        
-        return response_text, domain
-        
-    except Exception as e:
-        logger.error(f"Error running agent: {e}", exc_info=True)
-        return f"Error: {str(e)}", None
+# Get server URL from environment variable, with a default
+MCP_SERVER_BASE_URL = os.environ.get("MCP_SERVER_URL", "http://localhost:8000")
+MCP_SERVER_URL = f"{MCP_SERVER_BASE_URL.rstrip('/')}/mcp/query"
 
 
-def run_query_sync(user_question: str, session_id: str):
-    """Synchronous wrapper for async agent query"""
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        return loop.run_until_complete(run_agent_query(user_question, session_id))
-    finally:
-        loop.close()
+
+# --- Authentication ---
+def authenticate():
+    """Handles user authentication via the sidebar."""
+    st.sidebar.title("🔐 Login")
+
+    if st.session_state.get("authenticated"):
+        st.sidebar.success(f"Welcome, {st.session_state.get('username')}!")
+        return True
+
+    creds_str = os.getenv("USER_CREDENTIALS")
+    
+    username = st.sidebar.text_input("Username", key="auth_user")
+    password = st.sidebar.text_input("Password", type="password", key="auth_pw")
+
+    if st.sidebar.button("Login", key="auth_login"):
+        user_credentials = [{"username": "admin", "password": "password"}] # Default credentials
+
+        # Try loading from environment variable
+        if creds_str:
+            try:
+                loaded_creds = json.loads(creds_str)
+                if isinstance(loaded_creds, list):
+                    user_credentials = loaded_creds
+                else:
+                    st.sidebar.error("USER_CREDENTIALS must be a JSON list of {username, password} objects.")
+                    return False
+            except json.JSONDecodeError:
+                st.sidebar.error("Invalid USER_CREDENTIALS JSON format.")
+                return False
+
+        # Check credentials
+        for cred in user_credentials:
+            if cred.get("username") == username and cred.get("password") == password:
+                st.session_state["authenticated"] = True
+                st.session_state["username"] = username
+                st.sidebar.success(f"Welcome, {username}!")
+                st.rerun()
+                return True
+
+        st.sidebar.error("Invalid username or password.")
+        return False
+
+    return False
 
 
-# ---------------------- MAIN APP ----------------------
+# --- Main Application ---
 def main():
-    st.set_page_config(
-        page_title="ADK CoPilot V1", 
-        page_icon="�", 
-        layout="wide", 
-        initial_sidebar_state="auto"
-    )
+    """Main function to run the Streamlit app."""
+    st.set_page_config(page_title="Orion Copilot", page_icon="🪐", layout="wide", initial_sidebar_state="auto")
 
-    # Custom CSS
+    
+
+    # Inject custom CSS to reduce top padding and show domain badge
     st.markdown(
         """
         <style>
             .block-container {
                 padding-top: 1rem;
             }
-            .stAlert {
-                margin-top: 1rem;
+            .domain-badge { 
+                padding: 2px 8px; 
+                border-radius: 4px; 
+                font-weight: bold; 
+                font-size: 0.8em; 
+                color: white; 
             }
+            .sourcing { background-color: #1f77b4; }
+            .collections { background-color: #ff7f0e; }
+            .disbursal { background-color: #2ca02c; }
+            .unknown { background-color: #7f7f7f; }
         </style>
-        """, 
-        unsafe_allow_html=True
-    )
-    
-    # Initialize session state
-    if "history" not in st.session_state:
-        st.session_state["history"] = []
-    if "session_id" not in st.session_state:
-        st.session_state["session_id"] = f"session_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        """, unsafe_allow_html=True)
 
-    # Sidebar: Chat History & Settings
+    # --- Initialize session state ---
+    if "history" not in st.session_state:
+        st.session_state.history = []
+    if "last_answer" not in st.session_state:
+        st.session_state.last_answer = ""
+    if "last_sql" not in st.session_state:
+        st.session_state.last_sql = ""
+    if "last_domain" not in st.session_state:
+        st.session_state.last_domain = ""
+    if "df_for_chart" not in st.session_state:
+        st.session_state.df_for_chart = None
+    if "csv_bytes" not in st.session_state:
+        st.session_state.csv_bytes = None
+    if "last_user_query" not in st.session_state:
+        st.session_state.last_user_query = ""
+    if "session_id" not in st.session_state:
+        st.session_state.session_id = str(uuid.uuid4())
+
+    # --- Sidebar ---
     with st.sidebar:
-        st.title("📚 Chat History")
-        
-        # Show configuration
-        with st.expander("⚙️ Configuration", expanded=False):
-            st.markdown(f"""
-            **GCP Project:** `{settings.gcp_project_id}`  
-            **Dataset:** `{settings.bigquery_dataset}`  
-            **Tables:**
-            - Sourcing: `{settings.sourcing_table}`
-            - Collections: `{settings.collections_table}`
-            - Disbursal: `{settings.disbursal_table}`
-            
-            **Session ID:** `{st.session_state['session_id']}`
-            """)
-        
-        st.markdown("---")
-        
-        # Display history
-        if st.session_state.get("history"):
+        st.title("Chat History")
+        # Add small controls for cache/session parity with v2
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Clear Cache"):
+                try:
+                    st.cache_resource.clear()
+                except Exception:
+                    try:
+                        st.experimental_memo_clear()
+                    except Exception:
+                        pass
+                st.rerun()
+        with col2:
+            if st.button("New Session"):
+                st.session_state.session_id = str(uuid.uuid4())
+                st.session_state.history = []
+                st.rerun()
+
+        if st.session_state.history:
+            # Display history in reverse order (most recent first)
             for i, item in enumerate(reversed(st.session_state.history)):
-                q = item.get("question", "")
-                a = item.get("answer", "")
-                domain = item.get("domain", "Unknown")
-                
-                with st.expander(f"**{len(st.session_state.history) - i}**: {q[:40]}..."):
-                    st.markdown(f"**🔹 Domain:** {domain}")
-                    st.markdown(f"**❓ You:** {q}")
-                    st.markdown(f"**🤖 Agent:**\n{a}")
+                # history items may be (q, a) or (q, a, domain)
+                if isinstance(item, (list, tuple)) and len(item) == 3:
+                    q, a, d = item
+                elif isinstance(item, (list, tuple)) and len(item) >= 2:
+                    q, a = item[0], item[1]
+                    d = ""
+                else:
+                    q, a, d = str(item), "", ""
+
+                with st.expander(f"**{len(st.session_state.history) - i}**: {q[:40]}"):
+                    st.markdown(f"**You:** {q}")
+                    if d:
+                        st.markdown(f"**Domain:** {d}")
+                    st.markdown(f"**Orion:**\n{a}")
         else:
             st.info("Your chat history will appear here.")
-        
-        # Clear history button
-        if st.button("🗑️ Clear History"):
-            st.session_state["history"] = []
-            st.session_state["session_id"] = f"session_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-            st.rerun()
 
-    # Main title
-    st.title("🤖 ADK CoPilot V1 - Loan Analytics Assistant")
+    # --- Main Content ---
+    st.title("Orion - The Nostradamus Copilot")
 
-    if "last_answer" not in st.session_state:
-        st.session_state["last_answer"] = ""
-    if "csv_bytes" not in st.session_state:
-        st.session_state["csv_bytes"] = None
-    # Keep client/toolset None in session (we create/cache inside background loop)
-    st.session_state.setdefault("client", None)
-    st.session_state.setdefault("toolset", None)
-    
-    # st.markdown("""I'm ready to answer your questions about the Two Wheeler Data. First, select a data source, then type your question below to get started!""")
-    st.markdown("The data is for illustration purposes only, and may not be the exact representation of the portfolio.")
-    # --- Data source selection ---
-    # st.markdown("---")
-    # st.markdown("##### Select a Data Source : ")
-
-    # Define the new, more descriptive options
-    option_historic = "Historical Performance Trends"
-    option_realtime = "Current Performance & Disbursals"
-
-    # data_choice = st.radio(
-    #     "Select which data to query:",
-    #     options=[option_historic, option_realtime],
-    #     key="data_choice",
-    #     label_visibility="collapsed"
-    # )
-
-    # # Display detailed explanations for each choice
-    # if data_choice == option_historic:
-    #     st.markdown(
-    #         """
-    #             <div style="margin-left:25px; background-color:#f0f2f6; padding:15px; border-left:5px solid #1f77b4; border-radius:8px;">
-    #             <b>What it's for:</b> Analyzing portfolio performance and health (GNS, NNS, DPD, etc.) over time.<br>
-    #             <b>Timeframe:</b> Covers all completed months, from April 2024 to the end of last month.<br>
-    #             <b>Example Questions:</b><br>
-    #             • Show me the GNS trend for the last 6 months.<br>
-    #             • Compare Q1 vs. Q2 portfolio health.<br>
-    #             • What was the total collection in May 2025?
-    #         </div>
-    #         """,
-    #         unsafe_allow_html=True
-    #     )
-
-    # elif data_choice == option_realtime:
-    #     st.markdown(
-    #         """
-    #             <div style="margin-left:25px; background-color:#f0f2f6; padding:15px; border-left:5px solid #1f77b4; border-radius:8px;">
-    #             <b>What it's for:</b> Getting the most recent, up-to-date snapshot of portfolio performance.<br>
-    #             <b>Timeframe:</b> Provides the latest available data (yesterday's performance).<br>
-    #             <b>Example Questions:</b><br>
-    #             • What is the month-to-date disbursal amount?<br>
-    #             • Show me yesterday's paid vs. unpaid accounts.<br>
-    #             • What is the current MTD disbursal for the North region?
-    #         </div>
-    #         """,
-    #         unsafe_allow_html=True
-    #     )
-
-
-    # Input area
+    # User input
     col1, col2 = st.columns([5, 1])
     with col1:
         st.markdown("##### Ask your question : ")
         user_query = st.text_area("**Ask your question:**", value="", height=68, key="user_query",label_visibility  = "collapsed")
-        user_query = f"{user_query}\n\nIMPORTANT: In SQL, never use '=' for text filters. Always use LOWER(column) LIKE LOWER('%value%'). This is mandatory."
 
     with col2:
         # Add empty lines to push the button down, aligning it with the text area input field
@@ -227,361 +185,249 @@ def main():
         st.text("")
         st.text("")
         submit_clicked = st.button("Submit Query", key="submit_query")
-    if submit_clicked:
-        st.session_state["trigger_run"] = True
     
-    if st.session_state.get("trigger_run"):
-        if not user_query.strip():
-            st.warning("Please enter a question.")
-            st.session_state["trigger_run"] = False
-        else:
-            with st.spinner("Processing your query..."):
-                history = st.session_state["history"]
+    if submit_clicked and user_query:
+        # Append the new question to history
+        st.session_state.df_for_chart = None
+        st.session_state.csv_bytes = None
+        st.session_state.last_answer = ""
+        st.session_state.last_sql = ""
+        st.session_state.history.append((user_query, "⏳ Processing..."))
+        
+        message_placeholder = st.empty()
+        message_placeholder.markdown("⏳ Processing your request...")
 
-                # Build contextual query
-                context_parts = []
-                for q, a in history:
-                    context_parts.append(f"Previous Question: {q}")
-                    context_parts.append(f"Previous Answer: {a}")
-                context_parts.append(f"Current Question: {user_query}")
-                full_query_with_context = f"{SYSTEM_INSTRUCTION}\n\n" + "\n\n".join(context_parts)
+        try:
+            # Prepare payload with the current question and previous history
+            # The backend expects history as a list of [question, answer] tuples
+            history_for_backend = st.session_state.history[:-1]
 
-                try:
-                    # Create/get Toolbox client & toolset inside the background loop (cached there)
-                    client, toolset_list = get_toolbox_and_toolset_for_query(config.TOOLSET_NAME)
-                    st.session_state["client"] = client
-                    st.session_state["toolset"] = toolset_list
+            # --- Call ADK agent backend (direct) ---
+            try:
+                # Lazy load and run the ADK agent (async wrapper)
+                from google.adk.sessions import InMemorySessionService
 
-                    ask_data_insights_tool = toolset_list[0]
-
-                    # if data_choice == option_realtime:
-                    #     tables_to_use = [{
-                    #         "projectId": config.PROJECT_ID,
-                    #         "datasetId": config.DATASET_ID_RT,
-                    #         "tableId": config.TABLE_ID_RT
-                    #     }]
-                    # elif data_choice == option_historic:
-                    #     tables_to_use = [{
-                    #         "projectId": config.PROJECT_ID,
-                    #         "datasetId": config.DATASET_ID_HIST,
-                    #         "tableId": config.TABLE_ID_HIST
-                    #     }]           
-                    
-                    tables_to_use = [{
-                        "projectId": config.PROJECT_ID,
-                        "datasetId": config.DATASET_ID_RT,
-                        "tableId": config.TABLE_ID_RT
-                    }]           
-                    
-                          
-                    
-                    temperature = 0.0
-                    final_query = f"Temperature setting: {temperature}\n\n{full_query_with_context}"
-
-                    # Execute the tool asynchronously but block until result (safe via background loop)
-                    coro = ask_data_insights_tool(
-                        user_query_with_context=final_query,
-                        table_references=json.dumps(tables_to_use),
-                        history=json.dumps(history) # Pass history to the backend
-                    )
-                    response_string = run_async_sync(coro)
-
-                    if not response_string:
-                        st.warning("No response received from the backend.")
-                        return
-
-                    # logger.debug("###################################################")
-                    # logger.debug("--- 1. RESPONSE STRING ---")
-                    # logger.debug(f"Type: {type(response_string)}")
-                    # logger.debug(f"response_string:\n{response_string}")
-                    # logger.debug("---------------------------------")
-
-
-
-                    # Parse toolbox response
-                    parsed_data = parse_tool_response(response_string)
-                    logger.debug("--- 2. PARSED DATA DICTIONARY ---")
-                    logger.debug(f"Type: {type(parsed_data)}")
-                    logger.debug(f"{parsed_data.keys()}")
-                    logger.debug("---------------------------------")
-                    logger.debug(f"Content:\n{parsed_data}")
-                    # logger.debug("---------------------------------")
-
-                    # Extract the data from the parsed dictionary
-                    # answer_string = parsed_data['Answer']
-                    # answer_string = extract_final_answer(parsed_data['Answer'])
-                    answer_string = parsed_data['Answer']
-
-                    # Fix for single-line markdown tables
-                    # answer_string = format_single_line_table(answer_string)
-
-                    print("###################################################")
-                    print("---  Answer ---")
-                    print(f"Answer:\n{answer_string}")
-                    print("---------------------------------")
-
-                    sql_query = parsed_data['SQL Generated']
-                    logger.debug("###################################################")
-                    logger.debug("---  sql_query ---")
-                    logger.debug(f"sql_query :\n{sql_query}")
-                    logger.debug("---------------------------------")
-
-                    chart_name = parsed_data.get("Chart name")
-                    x_axis = parsed_data.get("x_axis")
-                    y_axes = parsed_data.get("y_axes", [])
-                    logger.debug('#################')
-                    logger.debug(f'Chart Name - {chart_name}, X_Axis - {x_axis}, Y_Axes - {y_axes}')
-                    logger.debug('#################')
-
-
-                    if not answer_string:
-                        st.warning("Received response but could not extract a valid answer.")
-                        with st.expander("Raw Backend Response"):
-                            st.code(response_string)
-                        return
-
-                    main_content = answer_string.strip()
-                    # logger.debug("---  main_content ---")
-                    # logger.debug(f"main_content :\n{main_content}")
-                    # logger.debug("---------------------------------")
-
-
-                    # Log the interaction (no interaction_id)
-                    interaction_id = f"{st.session_state.get('username', 'anonymous')}-{datetime.now(timezone.utc).timestamp()}"
-                    st.session_state["interaction_id"] = interaction_id
-                    
-                    # Get user id from Streamlit session (fallback to anonymous)
-                    user_id = st.session_state.get("username", "anonymous")
+                async def run_agent_query_async(user_question: str, session_id: str, history: list):
+                    # Load agent and settings
                     try:
-                        log_to_bq(user_id, user_query=user_query, answer=main_content, interaction_id=interaction_id)
-                        logger.info(f'Interaction logged to BQ for {interaction_id}')
-                    except Exception as e:
-                        logger.warning(f"Failed to log to BQ: {e}")
-
-                    # --- After getting response_string ---
-                    if main_content:
-                        # Save to session so UI doesn't reset on button clicks
-                        st.session_state["last_answer"] = main_content
-                        st.session_state["last_sql"] = sql_query or ""
-                        st.session_state["last_user_query"] = user_query
-                        st.session_state["chart_name"] = chart_name
-                        st.session_state["x_axis"] = x_axis
-                        st.session_state["y_axes"] = y_axes
-                        st.session_state["df_for_chart"] = None # Reset
-
+                        from agent_refactored import root_agent
+                        from config.settings import settings
+                    except Exception:
                         try:
-                            df = markdown_table_to_df(answer_string)
-                            for col in df.columns[1:]:
-                                try:
-                                    df[col] = pd.to_numeric(df[col])
-                                except Exception:
-                                    pass
-                            csv_buffer = io.StringIO()
-                            st.session_state["df_for_chart"] = df # Save df for chart
-                            df.to_csv(csv_buffer, index=False)
-                            st.session_state["csv_bytes"] = csv_buffer.getvalue().encode("utf-8")
+                            from agent import root_agent
+                            from config.settings import settings
                         except Exception as e:
-                            logger.warning(f"CSV generation failed: {e}")
-                            st.session_state["csv_bytes"] = None
+                            raise RuntimeError(f"Failed to load agent: {e}")
 
-                    # Update history exactly as Chainlit did
-                    history.append((user_query, main_content))
-                    st.session_state["history"] = history
-                    st.session_state["last_answer"] = main_content
+                    # Build invocation context lazily to avoid hard dependency at import
+                    from google.adk.agents import InvocationContext, RunConfig
+                    try:
+                        from google.genai.types import Content, Part
+                    except Exception:
+                        # Fallback if genai types not present
+                        Content = None
+                        Part = None
 
+                    session_service = InMemorySessionService()
+                    session = None
+                    if hasattr(session_service, '_sessions') and session_id in session_service._sessions:
+                        try:
+                            session = session_service._sessions[session_id]
+                        except Exception:
+                            session_service._sessions.pop(session_id, None)
+
+                    if session is None:
+                        session = await session_service.create_session(
+                            session_id=session_id,
+                            app_name="orion-copilot",
+                            user_id=st.session_state.get("username", "anonymous")
+                        )
+
+                    # Build context
+                    if Content and Part:
+                        user_content = Content(parts=[Part(text=user_question)], role="user")
+                    else:
+                        # Minimal shim if types not available
+                        class _C:
+                            def __init__(self, text):
+                                self.text = text
+                        user_content = _C(user_question)
+
+                    ctx = InvocationContext(
+                        session_service=session_service,
+                        invocation_id=str(uuid.uuid4()),
+                        agent=root_agent,
+                        session=session,
+                        user_content=user_content,
+                        run_config=RunConfig()
+                    )
+
+                    response_parts = []
+                    selected_domain = "Unknown"
+                    sql_query = ""
+
+                    async for event in root_agent.run_async(ctx):
+                        if hasattr(event, 'content') and event.content:
+                            if hasattr(event.content, 'parts'):
+                                for part in event.content.parts:
+                                    if hasattr(part, 'text') and part.text:
+                                        response_parts.append(part.text)
+
+                        if 'routing_response' in ctx.session.state:
+                            data = ctx.session.state['routing_response']
+                            if isinstance(data, dict):
+                                selected_domain = data.get('selected_domain', 'Unknown')
+                            else:
+                                selected_domain = getattr(data, 'selected_domain', 'Unknown')
+                                if hasattr(selected_domain, 'value'):
+                                    selected_domain = selected_domain.value
+
+                        if 'sql_generation_response' in ctx.session.state:
+                            sql_data = ctx.session.state['sql_generation_response']
+                            if isinstance(sql_data, dict):
+                                sql_query = sql_data.get('sql_query', '')
+
+                    response_text = "\n".join(response_parts) if response_parts else "No response generated."
+                    return {"answer": response_text, "sql_query": sql_query, "domain": selected_domain}
+
+                # Run the async agent runner synchronously
+                result = asyncio.run(run_agent_query_async(user_query, st.session_state.session_id, history_for_backend))
+
+                answer = result.get("answer", "No result generated.")
+                sql_query = result.get("sql_query", "")
+                domain = result.get("domain", "")
+
+                message_placeholder.markdown(answer)
+                st.session_state.last_sql = sql_query
+                st.session_state.last_answer = answer
+                st.session_state.last_domain = domain
+                st.session_state.last_user_query = user_query
+
+                if domain:
+                    st.session_state.history[-1] = (user_query, answer, domain)
+                else:
+                    st.session_state.history[-1] = (user_query, answer)
+
+                # Generate CSV and DataFrame for chart
+                try:
+                    df = markdown_table_to_df(answer)
+                    st.session_state.df_for_chart = df
+                    csv_buffer = io.StringIO()
+                    df.to_csv(csv_buffer, index=False)
+                    st.session_state.csv_bytes = csv_buffer.getvalue().encode("utf-8")
                 except Exception as e:
-                    logger.error(f"An unexpected error occurred: {e}", exc_info=True)
-                    st.error(f"An unexpected error occurred: {str(e)}")
+                    logger.warning(f"Could not create DataFrame from answer: {e}")
 
-            st.session_state["trigger_run"] = False
+            except Exception as e:
+                logger.error(f"Agent call failed: {e}")
+                message_placeholder.error(f"Agent error: {e}")
+                st.session_state.history[-1] = (user_query, f"Agent error: {e}")
+
+        except requests.exceptions.RequestException as e:
+            error_message = f"Failed to connect to MCP server: {e}"
+            message_placeholder.error(error_message)
+            logger.error(error_message)
+            st.session_state.history[-1] = (user_query, error_message)
+        except Exception as e:
+            error_message = f"An unexpected error occurred: {e}"
+            message_placeholder.error(error_message)
+            logger.error(error_message, exc_info=True)
+            st.session_state.history[-1] = (user_query, error_message)
+
+        # Log interaction (after getting the answer)
+        try:
+            interaction_id = f"{st.session_state.get('username', 'anonymous')}-{datetime.now(timezone.utc).timestamp()}"
+            st.session_state["interaction_id"] = interaction_id
+            
+            # Get user id from Streamlit session (fallback to anonymous)
+            user_id = st.session_state.get("username", "anonymous")
+            log_to_bq(user_id, user_query=user_query, answer=st.session_state.last_answer, interaction_id=interaction_id, project_id=PROJECT_ID)
+        except Exception as e:
+            logger.warning(f"Failed to log to BQ: {e}")
+        
+        st.rerun()
 
     # --- Show the answer (persistent) ---
-    if "last_answer" in st.session_state and st.session_state["last_answer"]:
+    if st.session_state.last_answer:
         st.markdown("### Orion Answer")
+        # Show domain badge if available
+        if st.session_state.last_domain:
+            domain_str = st.session_state.last_domain
+            domain_class = domain_str.lower() if domain_str else "unknown"
+            st.markdown(
+                f'<span class="domain-badge {domain_class}">{domain_str}</span>',
+                unsafe_allow_html=True
+            )
 
-        answer_text = st.session_state["last_answer"]
-
-        table_text = clean_table_alignment_row(answer_text)
-        table_text = fix_incomplete_markdown_table(table_text)
+        answer_text = st.session_state.last_answer
         before, table_text, after = extract_markdown_table(answer_text)
 
         output_display, buttons = st.columns([5, 1])
 
-        logger.debug(f"before (repr): {repr(before)}")
-        logger.debug(f"type(before): {type(before)}")
-
-        if before and isinstance(before, str) and before.strip().lower() not in ["", "undefined", "none", "null", "```"]:
-            logger.debug("In before")
+        if before:
             output_display.markdown(before)
-        else:
-            logger.debug(f"Skipping before — invalid value: {repr(before)}")
-
         if table_text:
             try:
                 df = markdown_table_to_df(table_text)
-                # Format column names: capitalize, replace underscores
-                df.columns = [format_axis_title(col) for col in df.columns]
-
-                # styled_df = (
-                #     df.style.set_table_styles([
-                #         {"selector": "th", "props": [("font-weight", "bold"), ("text-align", "center")]}
-                #     ])
-                # )
-
-                # # ✅ Convert to HTML and render via markdown (allow HTML)
-                # html_table = styled_df.to_html()
-                # output_display.markdown(html_table, unsafe_allow_html=True)
                 output_display.dataframe(df, use_container_width=True, hide_index=True)
-
-            except Exception as e:
-                logger.warning(f"Failed to render styled dataframe, falling back to markdown. Error: {e}")
+            except Exception:
                 output_display.markdown(table_text)  # fallback
 
-        if after and isinstance(after, str) and after.strip().lower() not in ["", "undefined", "none", "null", "```"]:
+        if after:
             st.markdown(after)
 
         # ✅ View SQL collapsible section
-        with st.expander("View SQL Query", expanded=False):
-            if st.session_state.get("last_sql"):
-                st.code(st.session_state["last_sql"], language="sql")
-            else:
-                st.info("No SQL query available.")
+        if st.session_state.last_sql is not None and st.session_state.last_sql.strip():
+            with st.expander("View SQL Query", expanded=False):
+                if st.session_state.last_sql:
+                    st.code(st.session_state.last_sql, language="sql")
+                else:
+                    st.info("No SQL query available.")
 
         # ✅ View Chart collapsible section
-        with st.expander("View Chart", expanded=False):
-            chart_name = st.session_state.get("chart_name")
-            df_for_chart = st.session_state.get("df_for_chart")
+        if st.session_state.df_for_chart is not None and not st.session_state.df_for_chart.empty:
+            with st.expander("View Chart", expanded=False):
+                df_for_chart = st.session_state.get("df_for_chart")
 
-            if df_for_chart is not None and not df_for_chart.empty:
-                columns = df_for_chart.columns.tolist()
-                
-                # --- Get default axes from model or fallback ---
-                model_x_axis = st.session_state.get("x_axis")
-                model_y_axes = st.session_state.get("y_axes", [])
-
-                # Determine default X-axis
-                if model_x_axis and model_x_axis in columns:
-                    default_x_index = columns.index(model_x_axis)
-                else:
-                    default_x_index = 0 # Fallback to first column
-
-                # Determine default Y-axes
-                default_y_axes = []
-                if model_y_axes:
-                    # Handle if model_y_axes is a string like '["col1", "col2"]' or "col1, col2"
-                    if isinstance(model_y_axes, str):
-                        try:
-                            # Try parsing as a list literal
-                            parsed_axes = ast.literal_eval(model_y_axes)
-                            if isinstance(parsed_axes, list):
-                                model_y_axes = parsed_axes
-                            else: # Fallback for other string formats
-                                model_y_axes = [y.strip() for y in model_y_axes.split(',')]
-                        except (ValueError, SyntaxError):
-                            model_y_axes = [y.strip() for y in model_y_axes.split(',')]
+                if df_for_chart is not None and not df_for_chart.empty:
+                    columns = df_for_chart.columns.tolist()
                     
-                    default_y_axes = [col for col in model_y_axes if col in columns]
+                    # --- UI for axis selection ---
+                    col1, col2 = st.columns(2)
+                    selected_x_axis = col1.selectbox("Select X-Axis:", columns, index=0)
+                    
+                    y_axis_options = [col for col in columns if col != selected_x_axis]
+                    
+                    # Fallback to all other columns if none are numeric
+                    default_y_axes = [col for col in y_axis_options if pd.api.types.is_numeric_dtype(df_for_chart[col])]
+                    if not default_y_axes:
+                        default_y_axes = y_axis_options
 
-                if not default_y_axes and len(columns) > 1:
-                    # Fallback to all columns except the selected X-axis
-                    x_col_name = columns[default_x_index]
-                    default_y_axes = [col for col in columns if col != x_col_name]
+                    selected_y_axes = col2.multiselect("Select Y-Axis (one or more):", y_axis_options, default=default_y_axes)
 
-                # --- UI for axis selection ---
-                # st.markdown("##### Customize Chart Axes")
-                col1, col2 = st.columns(2)
-                selected_x_axis = col1.selectbox("Select X-Axis:", columns, index=default_x_index)
-                
-                # Ensure Y-axis choices don't include the selected X-axis
-                y_axis_options = [col for col in columns if col != selected_x_axis]
-                
-                # Filter default_y_axes to only include valid options
-                valid_default_y = [col for col in default_y_axes if col in y_axis_options]
-                
-                selected_y_axes = col2.multiselect("Select Y-Axis (one or more):", y_axis_options, default=valid_default_y)
-
-                # --- Generate Chart ---
-                if selected_x_axis and selected_y_axes:
-                    try:
-                        plot_df = df_for_chart.copy()
-
-                        # --- Detect and format X-axis values ---
-                        x_axis_is_date = False
+                    # --- Generate Chart ---
+                    if selected_x_axis and selected_y_axes:
                         try:
-                            # Try parsing to datetime (if possible)
-                            plot_df[selected_x_axis] = pd.to_datetime(plot_df[selected_x_axis], errors='raise')
-                            x_axis_is_date = True
-                            # Format for display as 'Mon-YY'
-                            plot_df["_x_display"] = plot_df[selected_x_axis].dt.strftime("%b-%y")
-                        except Exception:
-                            # If not dates, keep original text values as-is
-                            plot_df["_x_display"] = plot_df[selected_x_axis].astype(str)
-
-                        # --- Ensure all plottable Y-axis columns are numeric ---
-                        plottable_y_axes = []
-                        for col in selected_y_axes:
-                            try:
-                                plot_df[col] = pd.to_numeric(plot_df[col])
-                                plottable_y_axes.append(col)
-                            except (ValueError, TypeError):
-                                st.warning(f"Column '{col}' contains non-numeric values and will be excluded from the chart.", icon="⚠️")
-
-                        if plottable_y_axes:
-                            rename_map = {col: format_axis_title(col) for col in plottable_y_axes}
+                            plot_df = df_for_chart.copy()
+                            display_y_axes = [format_axis_title(col) for col in selected_y_axes]
+                            rename_map = dict(zip(selected_y_axes, display_y_axes))
                             plot_df.rename(columns=rename_map, inplace=True)
-                            display_y_axes = [rename_map[col] for col in plottable_y_axes]
 
-                            # --- Build line chart ---
                             fig = px.line(
                                 plot_df,
-                                x="_x_display",   # Use display-formatted X values
+                                x=selected_x_axis,
                                 y=display_y_axes,
-                                title=chart_name or " ",
                                 markers=True
                             )
-
-                            # --- Enforce categorical X-axis with exact tick order ---
-                            fig.update_xaxes(
-                                title_text=format_axis_title(selected_x_axis),
-                                type="category",  # categorical ensures exact values shown
-                                categoryorder="array",
-                                categoryarray=plot_df["_x_display"].tolist(),
-                                tickfont_color="black",
-                                title_font_color="black"
-                            )
-
-                            fig.update_layout(
-                                template="plotly_white",
-                                yaxis=dict(
-                                    title=dict(text="Value", font=dict(color='black')),
-                                    tickfont=dict(color='black')
-                                ),
-                                legend_title_text='Metrics',
-                                legend=dict(
-                                    orientation="h",
-                                    yanchor="bottom",
-                                    y=1.02,
-                                    xanchor="right",
-                                    x=1
-                                ),
-                                hovermode="x unified"
-                            )
-
+                            fig.update_xaxes(title_text=format_axis_title(selected_x_axis))
                             st.plotly_chart(fig, use_container_width=True)
 
-                        else:
-                            st.warning("No plottable numeric Y-axis columns selected.", icon="⚠️")
-
-                    except Exception as e:
-                        st.error(f"Error while creating chart: {e}")
-
-                    except Exception as e:
-                        logger.error(f"Failed to generate chart: {e}")
-                        st.warning(f"Could not generate the chart. Please check the error: {e}", icon="⚠️")
+                        except Exception as e:
+                            st.error(f"Error while creating chart: {e}")
+                    else:
+                        st.info("Please select at least one Y-axis column to generate a chart.")
                 else:
-                    st.info("Please select at least one Y-axis column to generate a chart.")
-            else:
-                st.info("No data available to generate a chart.")
+                    st.info("No data available to generate a chart.")
 
         # ✅ Download CSV — no rerun wipe
         csv_bytes = st.session_state.get("csv_bytes")
@@ -590,43 +436,50 @@ def main():
             with buttons:
                 st.write("")
                 st.download_button(
-                label="⬇️ Download CSV",
-                data=csv_bytes,
-                file_name="copilot_output.csv",
-                mime="text/csv",
-                key="download_csv_button",
-                help="Download the output table as CSV"
-            )
+                    label="⬇️ Download CSV",
+                    data=csv_bytes,
+                    file_name="copilot_output.csv",
+                    mime="text/csv",
+                    key="download_csv_button",
+                    help="Download the output table as CSV"
+                )
 
         # ✅ Feedback buttons — state-safe and logs to BQ
-        buttons.write(" ")
-        buttons.write(" ")
-        buttons.write("Please submit feedback:")
-        button1, button2 = buttons.columns([1, 1])
-        if button1.button("👍Helpful", key="helpful_button"):
-            try:
-                log_to_bq(
-                    user_id = st.session_state.get("username", "anonymous"),
-                    user_query=st.session_state.get("last_user_query"),
-                    answer=st.session_state.get("last_answer"),
-                    user_feedback='positive',
-                    interaction_id=st.session_state.get("interaction_id")
-                )
-                st.success("Thanks for your feedback!")
-            except Exception as e:
-                st.error(f"Failed to submit feedback: {e}")
+        with buttons:
+            st.write(" ")
+            st.write("Please submit feedback:")
+            button1, button2 = st.columns([1, 1])
+            if button1.button("👍", key="helpful_button", help="Helpful"):
+                try:
+                    log_to_bq(
+                        user_id = st.session_state.get("username", "anonymous"),
+                        user_query=st.session_state.last_user_query,
+                        answer=st.session_state.last_answer,
+                        user_feedback='positive',
+                        interaction_id=st.session_state.get("interaction_id"),
+                    )
+                    st.toast("Thanks for your feedback!", icon="👍")
+                except Exception as e:
+                    st.error(f"Failed to submit feedback: {e}")
 
-        if button2.button("👎Not Helpful", key="not_helpful_button"):
-            log_to_bq(user_id = st.session_state.get("username", "anonymous"), user_query=st.session_state.get("last_user_query"), answer=st.session_state.get("last_answer"), user_feedback='negative', interaction_id=st.session_state.get("interaction_id"))
-            st.warning("Feedback noted. Thanks for helping us improve!")
+            if button2.button("👎", key="not_helpful_button", help="Not Helpful"):
+                try:
+                    log_to_bq(     
+                        user_id = st.session_state.get("username", "anonymous"),
+                        user_query=st.session_state.last_user_query,
+                        answer=st.session_state.last_answer,
+                        user_feedback='negative',
+                        interaction_id=st.session_state.get("interaction_id"),
+                    )
+                    st.toast("Feedback noted. Thanks for helping us improve!", icon="👎")
+                except Exception as e:
+                    st.error(f"Failed to submit feedback: {e}")
 
-
-# ---------------------- ENTRY POINT ----------------------
+# --- Entry Point ---
 if __name__ == "__main__":
-    with st.sidebar:
-        st.image("https://www.ltfinance.com/images/default-source/company-logo/l-t-finance-logo.png?sfvrsn=e2123fc4_1")
-    # main()
-    if authenticate():
-        main()
-    else:
-        st.stop()
+    main()
+    # if authenticate():
+    #     main()
+    # else:
+    #     st.info("Please log in to continue.")
+    #     st.stop()
