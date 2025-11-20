@@ -5,7 +5,7 @@ from config.settings import settings
 import sys
 import os
 from pathlib import Path
-import logging
+from utils.json_logger import get_json_logger
 import asyncio
 
 # Setup paths
@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = get_json_logger(__name__)
 
 from google.auth import default
 

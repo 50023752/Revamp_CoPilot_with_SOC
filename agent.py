@@ -11,7 +11,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from config.settings import settings
-import logging
+from utils.json_logger import get_json_logger
 import re
 from datetime import datetime
 
@@ -32,7 +32,7 @@ from agents.execution.query_execution_agent import QueryExecutionAgent
 from contracts.routing_contracts import DomainType, RoutingRequest
 from contracts.sql_contracts import SQLGenerationRequest, SQLExecutionRequest
 
-logger = logging.getLogger(__name__)
+logger = get_json_logger(__name__)
 
 
 class OrchestratorAgent(BaseAgent):

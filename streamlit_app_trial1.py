@@ -6,7 +6,7 @@ from config.settings import settings
 import os
 import sys
 import asyncio
-import logging
+from utils.json_logger import get_json_logger
 import uuid
 from pathlib import Path
 from datetime import datetime
@@ -19,7 +19,7 @@ sys.path.insert(0, str(project_root))
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = get_json_logger(__name__)
 
 # 2. PAGE CONFIG
 st.set_page_config(

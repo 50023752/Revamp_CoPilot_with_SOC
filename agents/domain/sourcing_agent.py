@@ -5,7 +5,7 @@ Does NOT execute queries - delegates to QueryExecutionAgent
 """
 
 from config.settings import settings
-import logging
+from utils.json_logger import get_json_logger
 from datetime import datetime, timezone
 from typing import ClassVar, Optional, AsyncGenerator
 import uuid
@@ -29,7 +29,7 @@ from contracts.sql_contracts import (
 )
 from utils.schema_service import get_schema_service
 
-logger = logging.getLogger(__name__)
+logger = get_json_logger(__name__)
 
 
 class SourcingAgent(BaseAgent):
@@ -270,15 +270,11 @@ ORDER BY month DESC
                     f.write(accumulated_text)
                 logger.info(f"Partial LLM response saved to: {resp_path}")
                 try:
-                    print('\n' + '='*40)
-                    print('PARTIAL LLM RESPONSE START')
-                    print('='*40)
-                    print(accumulated_text)
-                    print('='*40)
-                    print('PARTIAL LLM RESPONSE END')
-                    print('='*40 + '\n')
+                    logger.debug('PARTIAL LLM RESPONSE START')
+                    logger.debug(accumulated_text)
+                    logger.debug('PARTIAL LLM RESPONSE END')
                 except Exception:
-                    logger.debug('Failed to print partial LLM response to stdout')
+                    logger.debug('Failed to log partial LLM response')
             except Exception:
                 logger.debug("Failed to save partial LLM response")
             raise
@@ -304,15 +300,11 @@ ORDER BY month DESC
             if len(accumulated_text) > 2000:
                 logger.debug(f"Raw LLM response (first 2000 chars): {accumulated_text[:2000]}")
                 try:
-                    print('\n' + '='*80)
-                    print('RAW LLM RESPONSE START')
-                    print('='*80)
-                    print(accumulated_text)
-                    print('='*80)
-                    print('RAW LLM RESPONSE END')
-                    print('='*80 + '\n')
+                    logger.debug('RAW LLM RESPONSE START')
+                    logger.debug(accumulated_text)
+                    logger.debug('RAW LLM RESPONSE END')
                 except Exception:
-                    logger.debug('Failed to print full LLM response to stdout')
+                    logger.debug('Failed to log full LLM response')
         except Exception:
             logger.debug("Failed to save full LLM response to temp file")
 

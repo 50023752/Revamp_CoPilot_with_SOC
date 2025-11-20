@@ -5,13 +5,14 @@ Does NOT execute queries - delegates to QueryExecutionAgent
 """
 
 from config.settings import settings
-import logging
+from utils.json_logger import get_json_logger
 from datetime import datetime, timezone
 from typing import ClassVar, Optional, AsyncGenerator
 import uuid
 import re
 import tempfile
 import os
+import sqlglot
 
 # Standard ADK imports
 from google.adk.agents import BaseAgent, LlmAgent
@@ -29,7 +30,7 @@ from contracts.sql_contracts import (
 )
 from utils.schema_service import get_schema_service
 
-logger = logging.getLogger(__name__)
+logger = get_json_logger(__name__)
 
 
 class CollectionsAgent(BaseAgent):
@@ -47,87 +48,84 @@ class CollectionsAgent(BaseAgent):
     model_config = {"arbitrary_types_allowed": True}
     
     # SQL generation instruction (schema injected dynamically)
-    INSTRUCTION_TEMPLATE: ClassVar[str] = f"""You are a BigQuery SQL expert for L&T Finance Two-Wheeler **collections data**.
+    INSTRUCTION_TEMPLATE: ClassVar[str] = f"""You are a Principal BigQuery SQL Expert for L&T Finance Two-Wheeler Collections.
+Your task is to generate **100% accurate GoogleSQL** based on the User Question, Semantic Schema, and strict Business Logic.
 
-**YOUR TASK**: Generate ONLY the SQL query based on the specific Question provided below.
-**CRITICAL**: IGNORE any previous conversation context (greetings, other topics). Focus ONLY on the SQL task.
+### 1. CONTEXT & SCHEMA
+**Target Table**: `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.collections_table}`
 
-## Table Information
-Table: `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.collections_table}`
-
-## Actual Table Schema (from BigQuery) - SEMANTIC VIEW
-This schema is grouped by business purpose. Read carefully.
+**Table Schema**:
 {{SCHEMA_PLACEHOLDER}}
 
-## Key SQL Generation Rules
+### 2. MANDATORY FILTERING LOGIC (DO NOT IGNORE)
 
-### 1. ALWAYS Check MOB Filter for GNS/NNS Calculations
-- GNS1, GNS2, GNS3, GNS4, GNS5, GNS6 → Use ONLY with corresponding MOB_ON_INSTL_START_DATE = 1, 2, 3, 4, 5, 6
-- NNS1, NNS2, NNS3, NNS4, NNS5, NNS6 → Use ONLY with corresponding MOB_ON_INSTL_START_DATE = 1, 2, 3, 4, 5, 6
-- EXAMPLE CORRECT: `WHERE MOB_ON_INSTL_START_DATE = 1 AND GNS1 = 'Y'`
-- EXAMPLE WRONG: `WHERE GNS1 = 'Y'` (missing MOB filter causes wrong results!)
+#### A. Account Status & Exclusions (Apply these unless asked otherwise)
+1.  **Standard Portfolio**: By default, EXCLUDE write-offs.
+    - SQL: `WHERE SOM_NPASTAGEID = 'REGULAR'`
+2.  **Active/Regular Accounts**: 
+    - SQL: `WHERE SOM_NPASTAGEID = 'REGULAR' AND SOM_POS > 0`
+3.  **Zero DPD**: 
+    - SQL: `WHERE SOM_DPD = 0`
+4.  **XBKT**: 
+    - SQL: `WHERE Bounce_Flag = 'Y' AND SOM_DPD = 0`
 
-### 2. DPD Buckets MUST Use Exact Values
-When filtering by SOM_DPD_BUCKET or DPD_BUCKET, ALWAYS use these EXACT values:
-- '0' for 0 dpd
-- '1' for 1-30 DPD
-- '2' for 31-60 DPD
-- '3' for 61-90 DPD
-- '4' for 91-120 DPD
-- '5' for 121+ DPD
+#### B. NNS & GNS Calculation Rules (CRITICAL)
+You **MUST** apply the corresponding `MOB` filter when querying NNS columns.
+- **NNS1** → `AND MOB_ON_INSTL_START_DATE = 1 AND NNS1 = 'Y'`
+- **NNS2** → `AND MOB_ON_INSTL_START_DATE = 2 AND NNS2 = 'Y'`
+- ... (Same logic for 3, 4, 5, 6)
+- **For GNS Only**: You must use Bounce_Flag and MOB_ON_INSTL_START_DATE filter for respective GNS
+  - **GNS1** → `WHERE MOB_ON_INSTL_START_DATE = 1 AND Bounce_Flag = 'Y'`
+  - **GNS2** → `WHERE MOB_ON_INSTL_START_DATE = 2 AND Bounce_Flag = 'Y'`
 
-### 3. EWS Band Grouping
-When grouping EWS_Model_Output_Band values:
-- 'Low' includes: R1, R2, R3
-- 'Medium' includes: R4, R5, R6, R7
-- 'High' includes: R8, R9, R10+
+#### C. Date Filtering (Time-Travel Rules)
+- **Column**: ALWAYS use `BUSINESS_DATE`.
+- **Current Portfolio** (Default if no date mentioned): 
+  - SQL: `WHERE BUSINESS_DATE = (SELECT MAX(BUSINESS_DATE) FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.collections_table}`)`
+- **Relative Dates**:
+  - "Last 3 Months": `WHERE BUSINESS_DATE >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH)`
+  - "Last 6 Months": `WHERE BUSINESS_DATE >= DATE_SUB(CURRENT_DATE(), INTERVAL 6 MONTH)`
 
-### 4. TIER Classification
-When using TIER field, convert to standard tiers:
-- Tier 1 = METRO
-- Tier 2 = URBAN, SEMI_URBAN
-- Tier 3 = RURAL
+### 3. VALUE MAPPINGS (Use EXACT Values)
 
-### 5. Date Filtering Best Practices
-- Use BUSINESS_DATE for all time-based filtering (most reliable)
-- Last 3 months: `WHERE BUSINESS_DATE >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH)`
-- Last 6 months: `WHERE BUSINESS_DATE >= DATE_SUB(CURRENT_DATE(), INTERVAL 6 MONTH)`
-- Current portfolio: `WHERE BUSINESS_DATE = (SELECT MAX(BUSINESS_DATE) FROM table)`
+| Concept | Logic / Value |
+| :--- | :--- |
+| **DPD Buckets** | 0 (0dpd), 1 (1-30), 2 (31-60), 3 (61-90), 4 (91-120), 5+ (121+) |
+| **EWS Bands** | Low = ('R1','R2','R3'); Medium = ('R4','R5','R6','R7'); High = ('R8','R9','R10','R10+') |
 
-### 6. Common Account Status Filters
-- Exclude written-offs: `WHERE NPASTAGEID != 'WO_SALE' OR NPASTAGEID IS NULL`
-- Regular accounts: `WHERE SOM_NPASTAGEID = 'REGULAR'`
-- Zero DPD: `WHERE ZERODPD_FLAG = 'Y' OR SOM_DPD = 0`
+### 4. SQL GENERATION RULES
+1.  **Dialect**: GoogleSQL (Standard SQL). Use backticks (\`) for table/column names.
+2.  **Safety**: If the user does NOT ask for an aggregation (COUNT/SUM), append `LIMIT 100`.
+3.  **Null Handling**: Use `COALESCE(col, 0)` for numeric math.
+4.  **Output**: Return ONLY the SQL code block inside triple backticks. No text.
 
-## Output Format
+### 5. EXAMPLES (Chain-of-Thought)
 
-Generate ONLY the SQL query wrapped in ```sql ``` tags. No explanations before or after.
-DO NOT name columns starting with numbers or special characters.
-    DO NOT produce any acknowledgements, confirmations, or conversational text. If you understand, do NOT reply 'Okay' or 'I am ready'. Reply only with the SQL block.
-
-Example:
-Question: "What is the GNS1 count and percentage for last 3 months by branch?"
-Response:
+**User**: "What is the GNS1 % for the last 3 months?"
+**Thought**: 
+1. User wants GNS1 -> Must apply `MOB_ON_INSTL_START_DATE = 1` AND `Bounce_Flag = 'Y'`.
+2. Timeframe -> `BUSINESS_DATE` >= last 3 months.
+3. Exclusions -> Keep standard `SOM_NPASTAGEID = 'REGULAR'`.
+**SQL**:
 ```sql
 SELECT 
-  BRANCHNAME,
-  COUNT(DISTINCT CASE WHEN MOB_ON_INSTL_START_DATE = 1 AND GNS1 = 'Y' THEN AGREEMENTNO END) as gns1_count,
-  COUNT(DISTINCT CASE WHEN MOB_ON_INSTL_START_DATE = 1 THEN AGREEMENTNO END) as total_mob1_accounts,
-  ROUND(
-    SAFE_DIVIDE(
-      COUNT(DISTINCT CASE WHEN MOB_ON_INSTL_START_DATE = 1 AND GNS1 = 'Y' THEN AGREEMENTNO END),
-      COUNT(DISTINCT CASE WHEN MOB_ON_INSTL_START_DATE = 1 THEN AGREEMENTNO END)
-    ) * 100, 2
-  ) as gns1_percentage
+  DATE_TRUNC(BUSINESS_DATE, MONTH) as month,
+  ROUND(SAFE_DIVIDE(
+    COUNT(DISTINCT CASE WHEN MOB_ON_INSTL_START_DATE = 1 AND Bounce_Flag = 'Y' AND GNS1 = 'Y' THEN AGREEMENTNO END),
+    COUNT(DISTINCT CASE WHEN MOB_ON_INSTL_START_DATE = 1 THEN AGREEMENTNO END)
+  ) * 100, 2) as gns1_percentage
 FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.collections_table}`
-WHERE BUSINESS_DATE >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH)
-  AND MOB_ON_INSTL_START_DATE >= 1
-GROUP BY BRANCHNAME
-ORDER BY gns1_count DESC
-```
+WHERE WHERE BUSINESS_DATE >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH)
+  AND SOM_NPASTAGEID = 'REGULAR'
+GROUP BY 1
+ORDER BY 1 DESC
 
-Question: "What is the 0+ dpd count and percentage for last 6 months?"
-Response:
+**User**: "What is the 0+ dpd count and percentage for last 6 months?"
+**Thought**: 
+1. User wants 0+ DPD-> Must apply `DPD > 0`.
+2. Timeframe -> `BUSINESS_DATE` >= last 6 months.
+3. Exclusions -> Keep standard `SOM_NPASTAGEID = 'REGULAR'`.
+**SQL**:
 ```sql
 SELECT
   DATE_TRUNC(BUSINESS_DATE, MONTH) AS month,
@@ -144,8 +142,6 @@ GROUP BY
 ORDER BY
   month DESC;
 ```
-
-
 """
     
     def __init__(self):
@@ -300,16 +296,13 @@ ORDER BY
                 with open(resp_path, 'w', encoding='utf-8') as f:
                     f.write(accumulated_text)
                 logger.info(f"Partial LLM response saved to: {resp_path}")
+                # Log partial LLM response at debug level (avoid raw prints)
                 try:
-                    print('\n' + '='*40)
-                    print('PARTIAL LLM RESPONSE START')
-                    print('='*40)
-                    print(accumulated_text)
-                    print('='*40)
-                    print('PARTIAL LLM RESPONSE END')
-                    print('='*40 + '\n')
+                    logger.debug('PARTIAL LLM RESPONSE START')
+                    logger.debug(accumulated_text)
+                    logger.debug('PARTIAL LLM RESPONSE END')
                 except Exception:
-                    logger.debug('Failed to print partial LLM response to stdout')
+                    logger.debug('Failed to log partial LLM response')
             except Exception:
                 logger.debug("Failed to save partial LLM response")
             raise
@@ -334,16 +327,13 @@ ORDER BY
             logger.info(f"Full LLM response saved to: {resp_path}")
             if len(accumulated_text) > 2000:
                 logger.debug(f"Raw LLM response (first 2000 chars): {accumulated_text[:2000]}")
+                # Log raw LLM response at debug level instead of printing
                 try:
-                    print('\n' + '='*80)
-                    print('RAW LLM RESPONSE START')
-                    print('='*80)
-                    print(accumulated_text)
-                    print('='*80)
-                    print('RAW LLM RESPONSE END')
-                    print('='*80 + '\n')
+                    logger.debug('RAW LLM RESPONSE START')
+                    logger.debug(accumulated_text)
+                    logger.debug('RAW LLM RESPONSE END')
                 except Exception:
-                    logger.debug('Failed to print full LLM response to stdout')
+                    logger.debug('Failed to log full LLM response')
         except Exception:
             logger.debug("Failed to save full LLM response to temp file")
 
@@ -366,82 +356,42 @@ ORDER BY
         return str(ctx.current_input or "")
 
     def _parse_and_validate(self, llm_output: str, question: str) -> SQLGenerationResponse:
-        """Logic to parse the LLM output into your structured response."""
-        # Prefer code-fenced SQL blocks. If not found, try to extract the
-        # first statement that starts with SELECT or WITH as a fallback.
+        """
+        Parses LLM output and validates using SQLGlot (AST) instead of Regex.
+        """
+        # 1. Extract SQL block
         sql_match = re.search(r'```sql\s+(.*?)\s+```', llm_output, re.DOTALL | re.IGNORECASE)
         if sql_match:
-            sql_query = sql_match.group(1).strip()
+            raw_sql = sql_match.group(1).strip()
         else:
-            # Remove common acknowledgment lines and try to find SQL lines
-            cleaned = llm_output.strip()
-            # Find first occurrence of a line starting with SELECT/WITH
-            lines = cleaned.splitlines()
-            start_idx = None
-            for i, line in enumerate(lines):
-                if re.match(r'^\s*(SELECT|WITH)\b', line, re.IGNORECASE):
-                    start_idx = i
-                    break
+            # Fallback extraction
+            cleaned = llm_output.replace("```sql", "").replace("```", "").strip()
+            raw_sql = cleaned
 
-            if start_idx is not None:
-                # Collect until a blank line or end
-                collected = []
-                for line in lines[start_idx:]:
-                    if line.strip() == '' and collected:
-                        break
-                    collected.append(line)
-                sql_query = "\n".join(collected).strip()
-            else:
-                # Last resort: strip any code fences and return what's left
-                sql_query = cleaned.replace("```sql", "").replace("```", "").strip()
-        
-        # Post-process: sanitize common aliasing issues produced by LLMs
-        def _sanitize_aliases(sql: str) -> (str, bool):
-            changed = False
-
-            # 1) Convert `AS 'alias'` or `as 'alias'` to `AS `alias``
-            def _as_repl(m):
-                nonlocal changed
-                alias = m.group(1)
-                new_alias = alias
-                if alias and alias[0].isdigit():
-                    new_alias = f"col_{alias}"
-                changed = True
-                return f"AS `{new_alias}`"
-
-            sql, n1 = re.subn(r"\bAS\s+'([A-Za-z0-9_]+)'", _as_repl, sql, flags=re.IGNORECASE)
-            if n1:
-                changed = True
-
-            # 2) Convert trailing single-quoted aliases after expressions: e.g. `expr 'alias',` -> `expr AS `alias`,`
-            def _trail_repl(m):
-                nonlocal changed
-                expr = m.group('expr')
-                alias = m.group('alias')
-                suffix = m.group('suffix') or ''
-                new_alias = alias
-                if alias and alias[0].isdigit():
-                    new_alias = f"col_{alias}"
-                changed = True
-                return f"{expr} AS `{new_alias}`{suffix}"
-
-            sql, n2 = re.subn(r"(?P<expr>[^,\n]+?)\s+'(?P<alias>[A-Za-z0-9_]+)'(?P<suffix>\s*(,|\n|$))", _trail_repl, sql)
-            if n2:
-                changed = True
-
-            return sql, changed
-
-        sanitized_sql, modified = _sanitize_aliases(sql_query)
-        if modified:
-            logger.info("Sanitized SQL aliases produced by LLM to conform to BigQuery syntax")
+        # 2. AST Validation & Formatting (The Fix)
+        try:
+            # Transpile ensures valid BigQuery syntax and removes weird artifacts
+            # It handles `AS` keywords correctly, unlike the old regex script.
+            clean_sql = sqlglot.transpile(
+                raw_sql, 
+                read=None, # Let sqlglot guess input dialect (usually accurate for standard SQL)
+                write="bigquery", 
+                pretty=True
+            )[0]
+            logger.info("✅ AST Validation Passed (SQLGlot)")
+        except Exception as e:
+            logger.error(f"❌ AST Validation Failed: {e}")
+            # Fallback: return raw SQL but log warning. 
+            # Often sqlglot is stricter than BQ, but usually it's right.
+            clean_sql = raw_sql
 
         return SQLGenerationResponse(
-            sql_query=sanitized_sql,
+            sql_query=clean_sql,
             metadata=QueryMetadata(
                 domain="COLLECTIONS",
                 intent=question,
                 generated_at=datetime.now(timezone.utc),
-                filters_applied={}, # You can implement your filter extraction here
+                filters_applied={}
             ),
             explanation="Generated via CollectionsAgent",
             expected_columns=[], 

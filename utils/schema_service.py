@@ -4,13 +4,13 @@ Provides column names, types, and descriptions to LLM agents
 Includes semantic grouping for business context
 """
 
-import logging
+from utils.json_logger import get_json_logger
 from typing import Dict, Optional, List
 from google.cloud import bigquery
 from google.auth import default
 import json
 
-logger = logging.getLogger(__name__)
+logger = get_json_logger(__name__)
 
 # Global schema cache to avoid repeated BigQuery API calls
 _SCHEMA_CACHE: Dict[str, Dict] = {}

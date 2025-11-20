@@ -2,13 +2,13 @@
 Schema Service - Fetches and caches BigQuery table schema
 Works with both ADK BigQueryToolset and direct BigQuery client
 """
-import logging
+from utils.json_logger import get_json_logger
 import time
 from typing import Dict, Optional
 from google.cloud import bigquery
 from google.auth import default
 
-logger = logging.getLogger(__name__)
+logger = get_json_logger(__name__)
 
 
 class SchemaService:
@@ -208,29 +208,29 @@ if __name__ == "__main__":
     )
     
     # Example 1: Get schema as markdown
-    print("\n=== Example 1: Schema as Markdown ===")
+    logger.info("=== Example 1: Schema as Markdown ===")
     collections_schema = service.get_table_schema_md(settings.collections_table)
-    print(collections_schema)
-    
+    logger.info(collections_schema)
+
     # Example 2: Get schema as compact list
-    print("\n=== Example 2: Schema as Compact List ===")
+    logger.info("=== Example 2: Schema as Compact List ===")
     schema_list = service.get_table_schema_list(settings.collections_table)
-    print(schema_list)
-    
+    logger.info(schema_list)
+
     # Example 3: Get schema with samples
-    print("\n=== Example 3: Schema with Sample Data ===")
+    logger.info("=== Example 3: Schema with Sample Data ===")
     schema_with_samples = service.get_table_schema_with_samples(settings.collections_table)
-    print(f"Columns: {schema_with_samples['columns']}")
-    print(f"Sample rows: {len(schema_with_samples['sample_rows'])}")
-    print(f"Total rows in table: {schema_with_samples['row_count']}")
-    
+    logger.info(f"Columns: {schema_with_samples['columns']}")
+    logger.info(f"Sample rows: {len(schema_with_samples['sample_rows'])}")
+    logger.info(f"Total rows in table: {schema_with_samples['row_count']}")
+
     # Example 4: Get TIMESTAMP columns
-    print("\n=== Example 4: TIMESTAMP Columns ===")
+    logger.info("=== Example 4: TIMESTAMP Columns ===")
     timestamp_cols = service.get_timestamp_columns(settings.collections_table)
-    print(f"TIMESTAMP fields: {timestamp_cols}")
-    
+    logger.info(f"TIMESTAMP fields: {timestamp_cols}")
+
     # Example 5: Using in a prompt
-    print("\n=== Example 5: Augmented Prompt (for agent) ===")
+    logger.info("=== Example 5: Augmented Prompt (for agent) ===")
     schema_md = service.get_table_schema_md(settings.collections_table)
     prompt = f"""
 You are a BigQuery SQL expert for collections data.
@@ -248,4 +248,4 @@ You are a BigQuery SQL expert for collections data.
 
 Response:
     """
-    print(prompt)
+    logger.info(prompt)

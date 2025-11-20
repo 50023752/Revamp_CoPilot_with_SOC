@@ -5,7 +5,7 @@ and LLM-based classification via a standard LlmAgent sub-agent.
 """
 import sys
 import os
-import logging
+from utils.json_logger import get_json_logger
 import re
 from typing import Dict, List, Optional, ClassVar
 import asyncio
@@ -25,7 +25,7 @@ from contracts.routing_contracts import (
     DomainType
 )
 
-logger = logging.getLogger(__name__)
+logger = get_json_logger(__name__)
 
 class IntentRouterAgent(BaseAgent):
     """
@@ -336,8 +336,8 @@ if __name__ == "__main__":
     async def main():
         try:
             agent = create_intent_router_agent()
-            print("Agent created successfully.")
+            logger.info("Agent created successfully.")
         except Exception as e:
-            print(f"Initialization failed: {e}")
+            logger.error(f"Initialization failed: {e}")
             
     asyncio.run(main())
