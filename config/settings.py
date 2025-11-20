@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     sourcing_table: str = Field(default='NA', validation_alias='SOURCING_TABLE')
     collections_table: str = Field(default='TW_NOSTD_MART_HIST', validation_alias='COLLECTIONS_TABLE')
     disbursal_table: str = Field(default='TW_NOSTD_MART_REALTIME_UPDATED', validation_alias='DISBURSAL_TABLE')
+    # Logging dataset/table for interaction logs
+    logging_dataset: str = Field(default='aiml_cj_nostd_mart', validation_alias='LOGGING_DATASET')
+    logging_table: str = Field(default='adk_copilot_logs', validation_alias='LOGGING_TABLE')
     
     # Vertex AI Configuration
     vertex_ai_location: str = Field(default='asia-south1', validation_alias='VERTEX_AI_LOCATION')

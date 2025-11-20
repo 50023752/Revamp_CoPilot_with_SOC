@@ -7,6 +7,7 @@ import os
 import sys
 import asyncio
 from utils.json_logger import get_json_logger
+from config.settings import settings
 import uuid
 from pathlib import Path
 from datetime import datetime, timezone
@@ -28,7 +29,7 @@ sys.path.insert(0, str(project_root))
 logger = get_json_logger(__name__)
 
 # Google Cloud configuration
-PROJECT_ID = os.getenv("GCP_PROJECT_ID", "analytics-datapipeline-prod")
+PROJECT_ID = os.getenv("GCP_PROJECT_ID", settings.gcp_project_id or "analytics-datapipeline-prod")
 
 # Page config
 st.set_page_config(
@@ -63,17 +64,31 @@ st.markdown("""
 
 def markdown_table_to_df(markdown_table: str) -> pd.DataFrame:
     """Convert markdown table to DataFrame"""
-    lines = [line.strip() for line in markdown_table.strip().split('\n') if line.strip()]
-    if len(lines) < 3:
+    lines = [line for line in markdown_table.strip().split('\n') if line.strip()]
+    if len(lines) < 2:
         raise ValueError("Not enough lines for a markdown table")
-    
-    headers = [h.strip() for h in lines[0].split('|')[1:-1]]
+
+    raw_headers = lines[0].split('|')
+    headers = [h.strip() for h in raw_headers[1:-1]] if len(raw_headers) > 2 else [h.strip() for h in raw_headers]
+
     rows = []
     for line in lines[2:]:
-        row = [cell.strip() for cell in line.split('|')[1:-1]]
-        rows.append(row)
-    
-    return pd.DataFrame(rows, columns=headers)
+        cells = [cell.strip() for cell in line.split('|')[1:-1]] if '|' in line else [cell.strip() for cell in line.split(',')]
+        # Normalize row length to header length
+        if len(cells) < len(headers):
+            # pad with empty strings
+            cells += [''] * (len(headers) - len(cells))
+        elif len(cells) > len(headers):
+            # truncate extras
+            cells = cells[:len(headers)]
+        rows.append(cells)
+
+    try:
+        return pd.DataFrame(rows, columns=headers)
+    except Exception as e:
+        # As a last resort, return a DataFrame without column names
+        logger.warning(f"Could not construct DataFrame with headers: {e}")
+        return pd.DataFrame(rows)
 
 
 def extract_markdown_table(text: str) -> tuple:
@@ -106,33 +121,66 @@ def format_axis_title(col_name: str) -> str:
 
 
 def log_to_bq(user_id: str, user_query: str, answer: str, interaction_id: str, 
-              user_feedback: str = None, project_id: str = PROJECT_ID):
+              user_feedback: str = None, domain: str = None, table_name: str = None, project_id: str = PROJECT_ID):
     """Log interaction to BigQuery"""
     try:
         from google.auth import default
+        from config.settings import settings
         credentials, _ = default()
         client = bigquery.Client(credentials=credentials, project=project_id)
         
-        dataset_id = os.getenv("LOGGING_DATASET", "copilot_logs")
-        table_id = os.getenv("LOGGING_TABLE", "user_interactions")
+        # Prefer configured logging dataset/table from environment or settings
+        dataset_id = settings.logging_dataset
+        table_id = settings.logging_table   
+        # Allow passing domain/table for clarity
+        domain_val = domain or 'UNKNOWN'
+        table_name_val = table_name or ''
         table_ref = f"{project_id}.{dataset_id}.{table_id}"
         
         row = {
             "interaction_id": interaction_id,
             "user_id": user_id,
+            "domain": domain_val,
+            "source_table": table_name_val,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "user_query": user_query,
             "answer": answer,
             "user_feedback": user_feedback
         }
         
+        # Ensure dataset exists
+        try:
+            dataset = client.get_dataset(dataset_id)
+        except Exception:
+            logger.info(f"Dataset {project_id}.{dataset_id} not found - creating it")
+            dataset = bigquery.Dataset(f"{project_id}.{dataset_id}")
+            dataset = client.create_dataset(dataset, exists_ok=True)
+
+        # Ensure table exists (create simple schema based on row keys)
+        try:
+            client.get_table(table_ref)
+        except Exception:
+            logger.info(f"Table {table_ref} not found - creating with inferred schema")
+            schema = [
+                bigquery.SchemaField("interaction_id", "STRING"),
+                bigquery.SchemaField("user_id", "STRING"),
+                bigquery.SchemaField("domain", "STRING"),
+                bigquery.SchemaField("source_table", "STRING"),
+                bigquery.SchemaField("timestamp", "STRING"),
+                bigquery.SchemaField("user_query", "STRING"),
+                bigquery.SchemaField("answer", "STRING"),
+                bigquery.SchemaField("user_feedback", "STRING"),
+            ]
+            table = bigquery.Table(table_ref, schema=schema)
+            client.create_table(table, exists_ok=True)
+
         errors = client.insert_rows_json(table_ref, [row])
         if errors:
             logger.warning(f"BigQuery logging errors: {errors}")
         else:
             logger.info(f"Logged interaction: {interaction_id}")
     except Exception as e:
-        logger.warning(f"Failed to log to BigQuery: {e}")
+        logger.warning(f"Failed to log to BigQuery: {e}", exc_info=True)
 
 
 # ---------------------- LAZY LOADING ----------------------
@@ -434,6 +482,25 @@ def main():
             # Generate CSV and DataFrame
             try:
                 df = markdown_table_to_df(answer)
+                # Augment results with domain and source_table for traceability
+                domain_val = st.session_state.get('last_domain', '')
+                src_table = ''
+                if domain_val and domain_val.upper() == 'COLLECTIONS':
+                    src_table = settings.collections_table
+                elif domain_val and domain_val.upper() == 'SOURCING':
+                    src_table = settings.sourcing_table
+                elif domain_val and domain_val.upper() == 'DISBURSAL':
+                    src_table = settings.disbursal_table
+
+                try:
+                    df['domain'] = domain_val
+                    df['source_table'] = src_table
+                except Exception:
+                    # If df is not mutable in-place, create a copy with added columns
+                    df = df.copy()
+                    df['domain'] = domain_val
+                    df['source_table'] = src_table
+
                 st.session_state.df_for_chart = df
                 csv_buffer = io.StringIO()
                 df.to_csv(csv_buffer, index=False)
@@ -452,7 +519,17 @@ def main():
             interaction_id = f"{st.session_state.get('username', 'anonymous')}-{datetime.now(timezone.utc).timestamp()}"
             st.session_state["interaction_id"] = interaction_id
             user_id = st.session_state.get("username", "anonymous")
-            log_to_bq(user_id, user_query, st.session_state.last_answer, interaction_id, project_id=PROJECT_ID)
+            # Determine source table based on selected domain
+            src_table = ''
+            domain_val = st.session_state.get('last_domain', '')
+            if domain_val and domain_val.upper() == 'COLLECTIONS':
+                src_table = settings.collections_table
+            elif domain_val and domain_val.upper() == 'SOURCING':
+                src_table = settings.sourcing_table
+            elif domain_val and domain_val.upper() == 'DISBURSAL':
+                src_table = settings.disbursal_table
+
+            log_to_bq(user_id, user_query, st.session_state.last_answer, interaction_id, project_id=PROJECT_ID, domain=domain_val, table_name=src_table)
         except Exception as e:
             logger.warning(f"Failed to log to BQ: {e}")
         
@@ -491,6 +568,18 @@ def main():
         # View SQL
         if st.session_state.last_sql and st.session_state.last_sql.strip():
             with st.expander("View SQL Query", expanded=False):
+                # Show domain and source table for context
+                domain_display = st.session_state.get('last_domain', '')
+                src_table_display = ''
+                if domain_display and domain_display.upper() == 'COLLECTIONS':
+                    src_table_display = settings.collections_table
+                elif domain_display and domain_display.upper() == 'SOURCING':
+                    src_table_display = settings.sourcing_table
+                elif domain_display and domain_display.upper() == 'DISBURSAL':
+                    src_table_display = settings.disbursal_table
+
+                if domain_display or src_table_display:
+                    st.markdown(f"**Domain:** {domain_display}  \\ **Source table:** {src_table_display}")
                 st.code(st.session_state.last_sql, language="sql")
 
         # View Chart
@@ -551,6 +640,10 @@ def main():
                         answer=st.session_state.last_answer,
                         user_feedback='positive',
                         interaction_id=st.session_state.get("interaction_id"),
+                        domain=st.session_state.get('last_domain', ''),
+                        table_name=(settings.collections_table if st.session_state.get('last_domain','').upper()=='COLLECTIONS' else (
+                            settings.sourcing_table if st.session_state.get('last_domain','').upper()=='SOURCING' else (
+                                settings.disbursal_table if st.session_state.get('last_domain','').upper()=='DISBURSAL' else ''))),
                     )
                     st.toast("Thanks for your feedback!", icon="👍")
                 except Exception as e:
@@ -564,6 +657,10 @@ def main():
                         answer=st.session_state.last_answer,
                         user_feedback='negative',
                         interaction_id=st.session_state.get("interaction_id"),
+                        domain=st.session_state.get('last_domain', ''),
+                        table_name=(settings.collections_table if st.session_state.get('last_domain','').upper()=='COLLECTIONS' else (
+                            settings.sourcing_table if st.session_state.get('last_domain','').upper()=='SOURCING' else (
+                                settings.disbursal_table if st.session_state.get('last_domain','').upper()=='DISBURSAL' else ''))),
                     )
                     st.toast("Feedback noted. Thanks for helping us improve!", icon="👎")
                 except Exception as e:
