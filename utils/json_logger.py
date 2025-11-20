@@ -1,6 +1,7 @@
 import json
 import logging
 import datetime
+import os
 
 
 class JsonFormatter(logging.Formatter):
@@ -48,7 +49,13 @@ def get_json_logger(name: str = "orion") -> logging.Logger:
     logger = logging.getLogger(name)
     if not logger.handlers:
         handler = logging.StreamHandler()
-        handler.setFormatter(JsonFormatter())
+        # Allow readable plain-text logs for local development
+        log_format = os.getenv("LOG_FORMAT", "json").lower()
+        if log_format in ("plain", "text"):
+            fmt = logging.Formatter("%(levelname)s:%(name)s:%(message)s")
+            handler.setFormatter(fmt)
+        else:
+            handler.setFormatter(JsonFormatter())
         logger.addHandler(handler)
         logger.setLevel(logging.INFO)
     return logger

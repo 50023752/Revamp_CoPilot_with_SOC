@@ -25,14 +25,45 @@ class SchemaService:
         self._initialize_client()
     
     def _initialize_client(self):
-        """Initialize BigQuery client"""
+        """Initialize BigQuery client with proper credential handling"""
         try:
-            credentials, _ = default()
-            self.client = bigquery.Client(credentials=credentials, project=self.project_id)
-            logger.info(f"SchemaService initialized for project: {self.project_id}")
+            # Use default credentials with explicit scopes to avoid compute engine metadata issues
+            credentials, project = default(scopes=['https://www.googleapis.com/auth/bigquery'])
+            
+            # Use project from credentials if not explicitly set
+            actual_project = self.project_id or project
+            
+            self.client = bigquery.Client(
+                credentials=credentials, 
+                project=actual_project,
+                default_query_job_config=bigquery.QueryJobConfig(
+                    use_query_cache=True,
+                    use_legacy_sql=False
+                )
+            )
+            logger.info(f"SchemaService initialized for project: {actual_project}")
         except Exception as e:
-            logger.error(f"Failed to initialize BigQuery client: {e}")
-            raise
+            logger.error(f"Failed to initialize BigQuery client: {e}", exc_info=True)
+            # Try fallback: use application default without compute engine
+            try:
+                from google.auth.credentials import AnonymousCredentials
+                import os
+                
+                # Check if GOOGLE_APPLICATION_CREDENTIALS is set
+                if 'GOOGLE_APPLICATION_CREDENTIALS' in os.environ:
+                    logger.info("Retrying with service account from GOOGLE_APPLICATION_CREDENTIALS")
+                    credentials, project = default(scopes=['https://www.googleapis.com/auth/bigquery'])
+                    self.client = bigquery.Client(credentials=credentials, project=self.project_id or project)
+                    logger.info(f"SchemaService initialized with service account for project: {self.project_id}")
+                else:
+                    logger.error("No valid credentials found. Set GOOGLE_APPLICATION_CREDENTIALS or run 'gcloud auth application-default login'")
+                    raise ValueError("BigQuery client initialization failed - no valid credentials")
+            except Exception as fallback_error:
+                logger.error(f"Fallback initialization also failed: {fallback_error}", exc_info=True)
+                raise RuntimeError(
+                    "Failed to initialize BigQuery client. "
+                    "Ensure GOOGLE_APPLICATION_CREDENTIALS is set or run 'gcloud auth application-default login'"
+                ) from e
     
     def get_schema_and_sample(
         self, 
