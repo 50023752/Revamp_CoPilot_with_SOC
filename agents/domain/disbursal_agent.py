@@ -12,6 +12,8 @@ import uuid
 import re
 import tempfile
 import os
+import sqlglot
+
 
 # Standard ADK imports
 from google.adk.agents import BaseAgent, LlmAgent
@@ -327,82 +329,48 @@ ORDER BY month DESC
         return str(ctx.current_input or "")
 
     def _parse_and_validate(self, llm_output: str, question: str) -> SQLGenerationResponse:
-        """Logic to parse the LLM output into your structured response."""
-        # Prefer code-fenced SQL blocks. If not found, try to extract the
-        # first statement that starts with SELECT or WITH as a fallback.
-        sql_match = re.search(r'```sql\s+(.*?)\s+```', llm_output, re.DOTALL | re.IGNORECASE)
+        """
+        Parses LLM output and validates using SQLGlot (AST) instead of Regex.
+        """
+        # 1. Extract SQL block - handle multiple code fence variants (sql, googlesql, bigquery, etc.)
+        sql_match = re.search(r'```(?:sql|googlesql|bigquery)\s+(.*?)\s+```', llm_output, re.DOTALL | re.IGNORECASE)
         if sql_match:
-            sql_query = sql_match.group(1).strip()
+            raw_sql = sql_match.group(1).strip()
         else:
-            # Remove common acknowledgment lines and try to find SQL lines
-            cleaned = llm_output.strip()
-            # Find first occurrence of a line starting with SELECT/WITH
-            lines = cleaned.splitlines()
-            start_idx = None
-            for i, line in enumerate(lines):
-                if re.match(r'^\s*(SELECT|WITH)\b', line, re.IGNORECASE):
-                    start_idx = i
-                    break
-
-            if start_idx is not None:
-                # Collect until a blank line or end
-                collected = []
-                for line in lines[start_idx:]:
-                    if line.strip() == '' and collected:
-                        break
-                    collected.append(line)
-                sql_query = "\n".join(collected).strip()
+            # Fallback: try any code fence
+            generic_fence = re.search(r'```[a-z]*\s+(.*?)\s+```', llm_output, re.DOTALL | re.IGNORECASE)
+            if generic_fence:
+                raw_sql = generic_fence.group(1).strip()
             else:
-                # Last resort: strip any code fences and return what's left
-                sql_query = cleaned.replace("```sql", "").replace("```", "").strip()
-        
-        # Post-process: sanitize common aliasing issues produced by LLMs
-        def _sanitize_aliases(sql: str) -> (str, bool):
-            changed = False
+                # Last resort: strip all code fences and take content
+                cleaned = re.sub(r'```[a-z]*', '', llm_output, flags=re.IGNORECASE)
+                cleaned = cleaned.replace("```", "").strip()
+                raw_sql = cleaned
 
-            # 1) Convert `AS 'alias'` or `as 'alias'` to `AS `alias``
-            def _as_repl(m):
-                nonlocal changed
-                alias = m.group(1)
-                new_alias = alias
-                if alias and alias[0].isdigit():
-                    new_alias = f"col_{alias}"
-                changed = True
-                return f"AS `{new_alias}`"
-
-            sql, n1 = re.subn(r"\bAS\s+'([A-Za-z0-9_]+)'", _as_repl, sql, flags=re.IGNORECASE)
-            if n1:
-                changed = True
-
-            # 2) Convert trailing single-quoted aliases after expressions: e.g. `expr 'alias',` -> `expr AS `alias`,`
-            def _trail_repl(m):
-                nonlocal changed
-                expr = m.group('expr')
-                alias = m.group('alias')
-                suffix = m.group('suffix') or ''
-                new_alias = alias
-                if alias and alias[0].isdigit():
-                    new_alias = f"col_{alias}"
-                changed = True
-                return f"{expr} AS `{new_alias}`{suffix}"
-
-            sql, n2 = re.subn(r"(?P<expr>[^,\n]+?)\s+'(?P<alias>[A-Za-z0-9_]+)'(?P<suffix>\s*(,|\n|$))", _trail_repl, sql)
-            if n2:
-                changed = True
-
-            return sql, changed
-
-        sanitized_sql, modified = _sanitize_aliases(sql_query)
-        if modified:
-            logger.info("Sanitized SQL aliases produced by LLM to conform to BigQuery syntax")
+        # 2. AST Validation & Formatting (The Fix)
+        try:
+            # Transpile ensures valid BigQuery syntax and removes weird artifacts
+            # It handles `AS` keywords correctly, unlike the old regex script.
+            clean_sql = sqlglot.transpile(
+                raw_sql, 
+                read=None, # Let sqlglot guess input dialect (usually accurate for standard SQL)
+                write="bigquery", 
+                pretty=True
+            )[0]
+            logger.info("✅ AST Validation Passed (SQLGlot)")
+        except Exception as e:
+            logger.error(f"❌ AST Validation Failed: {e}")
+            # Fallback: return raw SQL but log warning. 
+            # Often sqlglot is stricter than BQ, but usually it's right.
+            clean_sql = raw_sql
 
         return SQLGenerationResponse(
-            sql_query=sanitized_sql,
+            sql_query=clean_sql,
             metadata=QueryMetadata(
                 domain="DISBURSAL",
                 intent=question,
                 generated_at=datetime.now(timezone.utc),
-                filters_applied={}, # You can implement your filter extraction here
+                filters_applied={}
             ),
             explanation="Generated via DisbursalAgent",
             expected_columns=[], 

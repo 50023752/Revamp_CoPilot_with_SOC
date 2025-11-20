@@ -359,14 +359,20 @@ ORDER BY
         """
         Parses LLM output and validates using SQLGlot (AST) instead of Regex.
         """
-        # 1. Extract SQL block
-        sql_match = re.search(r'```sql\s+(.*?)\s+```', llm_output, re.DOTALL | re.IGNORECASE)
+        # 1. Extract SQL block - handle multiple code fence variants (sql, googlesql, bigquery, etc.)
+        sql_match = re.search(r'```(?:sql|googlesql|bigquery)\s+(.*?)\s+```', llm_output, re.DOTALL | re.IGNORECASE)
         if sql_match:
             raw_sql = sql_match.group(1).strip()
         else:
-            # Fallback extraction
-            cleaned = llm_output.replace("```sql", "").replace("```", "").strip()
-            raw_sql = cleaned
+            # Fallback: try any code fence
+            generic_fence = re.search(r'```[a-z]*\s+(.*?)\s+```', llm_output, re.DOTALL | re.IGNORECASE)
+            if generic_fence:
+                raw_sql = generic_fence.group(1).strip()
+            else:
+                # Last resort: strip all code fences and take content
+                cleaned = re.sub(r'```[a-z]*', '', llm_output, flags=re.IGNORECASE)
+                cleaned = cleaned.replace("```", "").strip()
+                raw_sql = cleaned
 
         # 2. AST Validation & Formatting (The Fix)
         try:
