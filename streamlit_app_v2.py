@@ -320,20 +320,58 @@ async def run_agent_query_async(user_question: str, session_id: str, history: li
         # Extract domain
         if 'routing_response' in ctx.session.state:
             data = ctx.session.state['routing_response']
-            if isinstance(data, dict):
-                selected_domain = data.get('selected_domain', 'Unknown')
-            else:
-                selected_domain = getattr(data, 'selected_domain', 'Unknown')
-                if hasattr(selected_domain, 'value'):
-                    selected_domain = selected_domain.value
+            # Support multiple shapes: dict from model_dump, pydantic model, enum, or nested dict
+            try:
+                sel = None
+                if isinstance(data, dict):
+                    sel = data.get('selected_domain') or data.get('selected_domain', None)
+                else:
+                    sel = getattr(data, 'selected_domain', None)
+
+                # Enum -> value
+                try:
+                    from enum import Enum as _Enum
+                    if isinstance(sel, _Enum):
+                        sel = sel.value
+                except Exception:
+                    pass
+
+                # Nested dict (edge cases)
+                if isinstance(sel, dict):
+                    sel = sel.get('value') or sel.get('name') or sel.get('selected_domain')
+
+                if isinstance(sel, str):
+                    selected_domain = sel
+                elif hasattr(sel, 'value'):
+                    selected_domain = getattr(sel, 'value')
+                elif sel is not None:
+                    selected_domain = str(sel)
+            except Exception:
+                # Keep earlier value if parsing fails
+                pass
         
         # Extract SQL
         if 'sql_generation_response' in ctx.session.state:
             sql_data = ctx.session.state['sql_generation_response']
-            if isinstance(sql_data, dict):
-                sql_query = sql_data.get('sql_query', '')
+            try:
+                if isinstance(sql_data, dict):
+                    sql_query = sql_data.get('sql_query', '') or sql_data.get('sql', '') or sql_data.get('generated_sql', '')
+                else:
+                    sql_query = getattr(sql_data, 'sql_query', '') or getattr(sql_data, 'generated_sql', '') or ''
+            except Exception:
+                sql_query = ''
 
     response_text = "\n".join(response_parts) if response_parts else "No response generated."
+    # Final fallback: if domain still unknown, try conversation history
+    if (not selected_domain or selected_domain == "Unknown") and hasattr(ctx, 'session'):
+        try:
+            hist = ctx.session.state.get('conversation_history', [])
+            if hist:
+                last = hist[-1]
+                if isinstance(last, dict):
+                    selected_domain = last.get('domain', selected_domain)
+        except Exception:
+            pass
     return {
         "answer": response_text,
         "sql_query": sql_query,

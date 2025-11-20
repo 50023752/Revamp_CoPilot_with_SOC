@@ -89,6 +89,11 @@ class OrchestratorAgent(BaseAgent):
             # --- FIX 1: Pass 'context=ctx' ---
             # We modified the router to require context for its LlmAgent sub-agent
             routing_response = await router.route(routing_request, context=ctx)
+            # Persist routing response to session state for downstream consumers (UI, logging)
+            try:
+                ctx.session.state['routing_response'] = routing_response.model_dump()
+            except Exception:
+                ctx.session.state['routing_response'] = routing_response
             
             domain = routing_response.selected_domain
             
@@ -114,6 +119,11 @@ class OrchestratorAgent(BaseAgent):
             # --- FIX 2: Pass 'context=ctx' ---
             # We modified the Collections agent to require context for history masking
             sql_gen_response = await domain_agent.generate_sql(sql_gen_request, context=ctx)
+            # Persist SQL generation response to session state so frontend can access generated SQL
+            try:
+                ctx.session.state['sql_generation_response'] = sql_gen_response.model_dump()
+            except Exception:
+                ctx.session.state['sql_generation_response'] = sql_gen_response
             
             logger.info(f"✅ SQL generated")
             
