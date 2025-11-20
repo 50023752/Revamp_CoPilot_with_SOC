@@ -25,7 +25,6 @@ project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
 logger = get_json_logger(__name__)
 
 # Google Cloud configuration

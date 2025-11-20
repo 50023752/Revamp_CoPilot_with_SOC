@@ -1,6 +1,13 @@
 import asyncio
+import sys
+import os
 from unittest.mock import MagicMock, patch
 from datetime import datetime
+
+# Ensure repo root is on sys.path when running the test as a script
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
 from agents.execution.query_execution_agent import QueryExecutionAgent, SQLReflectionAgent
 from contracts.sql_contracts import SQLExecutionRequest, QueryMetadata, ExecutionStatus
@@ -67,4 +74,44 @@ def test_reflection_fix_and_success(monkeypatch):
 
 
 if __name__ == '__main__':
-    asyncio.run(test_reflection_fix_and_success())
+    # Provide a minimal monkeypatch replacement so the test can be run standalone
+    class SimpleMonkeyPatch:
+        def setattr(self, target, value):
+            """Support setting attributes by dotted-path string.
+
+            This resolves the longest importable module prefix then walks
+            remaining attribute names via getattr to set the final attribute.
+
+            Example supported targets:
+              - "agents.execution.query_execution_agent.exceptions.BadRequest"
+              - "module.submodule.attr"
+            """
+            if not isinstance(target, str):
+                raise TypeError("SimpleMonkeyPatch only supports dotted-string targets")
+
+            parts = target.split('.')
+            # Find the longest prefix that can be imported as a module
+            for i in range(len(parts), 0, -1):
+                module_name = '.'.join(parts[:i])
+                try:
+                    mod = __import__(module_name, fromlist=['*'])
+                except ModuleNotFoundError:
+                    continue
+                except Exception:
+                    # Other import issues - re-raise to signal test author
+                    raise
+
+                # Success: walk remaining attribute parts (if any)
+                obj = mod
+                for attr in parts[i: -1]:
+                    obj = getattr(obj, attr)
+
+                final_attr = parts[-1]
+                setattr(obj, final_attr, value)
+                return
+
+            # If we couldn't import any prefix, raise informative error
+            raise ImportError(f"Could not resolve importable module in target '{target}'")
+
+    monkey = SimpleMonkeyPatch()
+    asyncio.run(test_reflection_fix_and_success(monkey))
