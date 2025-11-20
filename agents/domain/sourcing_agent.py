@@ -68,7 +68,7 @@ Your task is to translate natural language business questions into **execution-r
 
 | **Question Context** | **Date Field to Use** | **Filter Logic** |
 |:---------------------|:----------------------|:-----------------|
-| **Disbursal Trends/Volumes**<br>(e.g., "Disbursal trend in Oct", "Amount disbursed") | `DISBURSED_DATE` | `WHERE DISBURSED_DATE IS NOT NULL`<br>`AND DISBURSED_DATE >= '2025-10-01'` |
+| **Disbursal Trends/Volumes**<br>(e.g., "Disbursal trend in Oct", "Amount disbursed") | `DISBURSALDATE` | `WHERE DISBURSALDATE IS NOT NULL`<br>`AND DISBURSALDATE >= '2025-10-01'` |
 | **Sourcing Volume/Approvals/Rejections**<br>(e.g., "How many applications", "Approval rate") | `LastModifiedDate` | `WHERE DATE(LastModifiedDate) >= ...`<br>**⚠️ Must wrap in DATE()** |
 
 **Type Safety Rules**:
@@ -86,7 +86,7 @@ WHERE DATE(LastModifiedDate) >= DATE_SUB(DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INT
 WHERE DATE(LastModifiedDate) >= '2025-10-01' AND DATE(LastModifiedDate) < '2025-11-01'
 
 -- Disbursal trend for a specific month
-WHERE DISBURSED_DATE >= '2025-10-01' AND DISBURSED_DATE < '2025-11-01'
+WHERE DISBURSALDATE >= '2025-10-01' AND DISBURSALDATE < '2025-11-01'
 ```
 
 ---
@@ -94,9 +94,9 @@ WHERE DISBURSED_DATE >= '2025-10-01' AND DISBURSED_DATE < '2025-11-01'
 ## 3. Business Definitions & Logic
 
 ### A. Application Status (Critical - Use Exact Logic)
-- **Approved**: `BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction')` **OR** `ABND IS NOT NULL`
-- **Rejected**: `BRE_Sanction_Result__c IN ('REJECT', 'Reject')` **OR** `REJECTED IS NOT NULL`
-- **Disbursed**: `DISBURSED IS NOT NULL`
+- **Approved**: `BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction')`
+- **Rejected**: `BRE_Sanction_Result__c IN ('REJECT', 'Reject')`
+- **Disbursed**: `DISBURSALDATE IS NOT NULL`
 
 ### B. Scorecard Model Decoding (`SCORECARD_MODEL_BRE__c`)
 This column contains composite codes (e.g., `NTC_BKH_SAL`, `BH_BKNH_NON_SAL`). Use `LIKE` patterns to decode.
@@ -128,7 +128,7 @@ This column contains composite codes (e.g., `NTC_BKH_SAL`, `BH_BKNH_NON_SAL`). U
 - **State**: `state`
 
 ### E. Product & Asset
-- **Superbikes**: `asset_price > 400000` **AND** (`asset_model_name LIKE '%Superbike%'` **OR** `asset_model_name LIKE '%Premium%'`)
+- **Superbikes**: `asset_price > 400000`
 - **Model-specific**: Filter by exact `asset_model_name` (e.g., 'TVS XL')
 - **RC Pendency**: Applications where RC (Registration Certificate) is pending — filter by RC status fields
 
@@ -147,7 +147,7 @@ ROUND(SAFE_DIVIDE(
 **Approval Rate**:
 ```sql
 ROUND(SAFE_DIVIDE(
-  COUNT(CASE WHEN BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction') OR ABND IS NOT NULL THEN 1 END), 
+  COUNT(CASE WHEN BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction') THEN 1 END), 
   COUNT(*)
 ) * 100, 2)
 ```
@@ -155,7 +155,7 @@ ROUND(SAFE_DIVIDE(
 **Rejection Rate**:
 ```sql
 ROUND(SAFE_DIVIDE(
-  COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') OR REJECTED IS NOT NULL THEN 1 END), 
+  COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END), 
   COUNT(*)
 ) * 100, 2)
 ```
@@ -184,13 +184,12 @@ FORMAT_DATE('%Y-%m', month)  -- 2025-10
 **Q1: "What is the disbursal trend for Superbikes > 4 Lakhs in Oct 2025?"**
 ```sql
 SELECT 
-  DATE_TRUNC(DISBURSED_DATE, DAY) as trend_date,
+  DATE_TRUNC(DISBURSALDATE, DAY) as trend_date,
   COUNT(*) as disbursed_count,
   ROUND(SUM(amount) / 10000000, 2) as total_disbursed_cr
 FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.sourcing_table}`
-WHERE DISBURSED_DATE >= '2025-10-01' AND DISBURSED_DATE < '2025-11-01'
+WHERE DISBURSALDATE >= '2025-10-01' AND DISBURSALDATE < '2025-11-01'
   AND asset_price > 400000
-  AND (asset_model_name LIKE '%Superbike%' OR asset_model_name LIKE '%Premium%')
 GROUP BY 1
 ORDER BY 1
 ```
@@ -200,9 +199,9 @@ ORDER BY 1
 SELECT 
   CIBIL_SCORE_BAND,
   COUNT(*) as total_apps,
-  COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') OR REJECTED IS NOT NULL THEN 1 END) as rejected_count,
+  COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END) as rejected_count,
   ROUND(SAFE_DIVIDE(
-    COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') OR REJECTED IS NOT NULL THEN 1 END),
+    COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END),
     COUNT(*)
   ) * 100, 2) as rejection_rate_pct
 FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.sourcing_table}`
@@ -242,9 +241,9 @@ Response:
 ```sql
 SELECT 
   COUNT(*) as total_applications,
-  COUNT(CASE WHEN BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction') OR ABND IS NOT NULL THEN 1 END) as approved_count,
+  COUNT(CASE WHEN BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction') THEN 1 END) as approved_count,
   ROUND(SAFE_DIVIDE(
-    COUNT(CASE WHEN BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction') OR ABND IS NOT NULL THEN 1 END),
+    COUNT(CASE WHEN BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction') THEN 1 END),
     COUNT(*)
   ) * 100, 2) as approval_rate_pct
 FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.sourcing_table}`
