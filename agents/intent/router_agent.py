@@ -68,17 +68,17 @@ class IntentRouterAgent(BaseAgent):
                 r'\bapplication\s+(volume|count|login)\b',
                 r'\bloan\s+application\b',
             ],
-        },
-        DomainType.DISBURSAL: {
-            'keywords': [
-                'disbursal', 'disbursement', 'payout', 'transfer',
-                'neft', 'rtgs', 'imps', 'fund', 'processing',
-                'disbursed', 'payment mode'
-            ],
-            'patterns': [
-                r'\bdisburs(al|ement)\s+(amount|count|trend)\b',
-                r'\bpayment\s+mode\b',
-            ],
+        # },
+        # DomainType.DISBURSAL: {
+        #     'keywords': [
+        #         'disbursal', 'disbursement', 'payout', 'transfer',
+        #         'neft', 'rtgs', 'imps', 'fund', 'processing',
+        #         'disbursed', 'payment mode'
+        #     ],
+        #     'patterns': [
+        #         r'\bdisburs(al|ement)\s+(amount|count|trend)\b',
+        #         r'\bpayment\s+mode\b',
+        #     ],
         }
     }
     
@@ -89,25 +89,21 @@ class IntentRouterAgent(BaseAgent):
     CLASSIFIER_INSTRUCTION: ClassVar[str] = """You are a domain classifier. Classify the question into exactly ONE domain.
 
 **DOMAINS:**
-- SOURCING: Applications, approvals, customer acquisition, loan processing
+- SOURCING: Applications, approvals, customer acquisition, loan processing, disbursals, cyclops, model_performance
 - COLLECTIONS: DPD, delinquency, recovery, overdue payments, portfolio health
-- DISBURSAL: Payouts, fund transfers, disbursement amounts, payment modes
 
 **CRITICAL RULES:**
-1. Return ONLY one word: SOURCING, COLLECTIONS, or DISBURSAL
+1. Return ONLY one word: SOURCING or COLLECTIONS
 2. DO NOT add punctuation, explanation, or greetings
 3. DO NOT say "okay", "sure", or acknowledge - just return the domain name
 4. If uncertain, return SOURCING
 
 **Examples:**
-Question: "What is the dpd distrubution month on month for last 6 months?"
+Question: "What is the dpd distribution month on month for last 6 months?"
 Response: COLLECTIONS
 
 Question: "What is login to approval conversion rate in last 6 months?"
 Response: SOURCING
-
-Question: "What is disbursal count?"
-Response: DISBURSAL
 
 Now classify this question and return ONLY the domain name:"""
 
@@ -244,9 +240,10 @@ Now classify this question and return ONLY the domain name:"""
         if "COLLECT" in cleaned_response or "DPD" in cleaned_response or "DELINQ" in cleaned_response:
             logger.info(f"LLM partial match: COLLECTIONS (from '{cleaned_response}')")
             return DomainType.COLLECTIONS
+        # Map any disbursal-like responses to SOURCING for now
         if "DISBURS" in cleaned_response or "PAYOUT" in cleaned_response:
-            logger.info(f"LLM partial match: DISBURSAL (from '{cleaned_response}')")
-            return DomainType.DISBURSAL
+            logger.info(f"LLM partial match: DISBURSAL-like mapped to SOURCING (from '{cleaned_response}')")
+            return DomainType.SOURCING
         
         logger.warning(f"LLM returned unclear response: '{cleaned_response}' - falling back to keyword routing")
         return self._fallback_routing(question)

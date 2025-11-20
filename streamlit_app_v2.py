@@ -3,6 +3,7 @@ Streamlit Frontend V2 - Orion Copilot with ADK Agentic Framework
 Maintains original UI design with refactored agent backend
 """
 import streamlit as st
+import re
 import os
 import sys
 import asyncio
@@ -120,6 +121,34 @@ def format_axis_title(col_name: str) -> str:
     return col_name.replace('_', ' ').title()
 
 
+def extract_sql_from_text(text: str) -> str:
+    """Extract SQL code block from text. Returns SQL string or empty string."""
+    if not text:
+        return ""
+    # Prefer code-fenced SQL blocks - handle variants
+    match = re.search(r'```(?:sql|googlesql|bigquery)\s+(.*?)\s+```', text, re.DOTALL | re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+    # Generic code fence
+    match = re.search(r'```[a-zA-Z0-9_-]*\s+(.*?)\s+```', text, re.DOTALL | re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+    # Fallback: try to find first SELECT/WITH ... block
+    lines = text.splitlines()
+    start = None
+    for i, line in enumerate(lines):
+        if re.match(r'^\s*(SELECT|WITH)\b', line, re.IGNORECASE):
+            start = i
+            break
+    if start is not None:
+        # collect until end or blank line
+        collected = []
+        for line in lines[start:]:
+            collected.append(line)
+        return '\n'.join(collected).strip()
+    return ""
+
+
 def log_to_bq(user_id: str, user_query: str, answer: str, interaction_id: str, 
               user_feedback: str = None, domain: str = None, table_name: str = None, project_id: str = PROJECT_ID):
     """Log interaction to BigQuery"""
@@ -143,6 +172,7 @@ def log_to_bq(user_id: str, user_query: str, answer: str, interaction_id: str,
             "domain": domain_val,
             "source_table": table_name_val,
             "timestamp": datetime.now(timezone.utc).isoformat(),
+            "generated_sql": extract_sql_from_text(answer),
             "user_query": user_query,
             "answer": answer,
             "user_feedback": user_feedback
@@ -167,6 +197,7 @@ def log_to_bq(user_id: str, user_query: str, answer: str, interaction_id: str,
                 bigquery.SchemaField("domain", "STRING"),
                 bigquery.SchemaField("source_table", "STRING"),
                 bigquery.SchemaField("timestamp", "STRING"),
+                bigquery.SchemaField("generated_sql", "STRING"),
                 bigquery.SchemaField("user_query", "STRING"),
                 bigquery.SchemaField("answer", "STRING"),
                 bigquery.SchemaField("user_feedback", "STRING"),
@@ -495,11 +526,13 @@ def main():
                 try:
                     df['domain'] = domain_val
                     df['source_table'] = src_table
+                    df['generated_sql'] = extract_sql_from_text(answer)
                 except Exception:
                     # If df is not mutable in-place, create a copy with added columns
                     df = df.copy()
                     df['domain'] = domain_val
                     df['source_table'] = src_table
+                    df['generated_sql'] = extract_sql_from_text(answer)
 
                 st.session_state.df_for_chart = df
                 csv_buffer = io.StringIO()
