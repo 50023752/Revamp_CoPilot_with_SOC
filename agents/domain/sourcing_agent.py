@@ -98,21 +98,21 @@ WHERE DISBURSALDATE >= '2025-10-01' AND DISBURSALDATE < '2025-11-01'
 - **Rejected**: `BRE_Sanction_Result__c IN ('REJECT', 'Reject')`
 - **Disbursed**: `DISBURSALDATE IS NOT NULL`
 
-### B. Scorecard Model Decoding (`SCORECARD_MODEL_BRE__c`)
+### B. Scorecard Model Decoding (`FINAL_APPLICANT_SCORECARD_MODEL_BRE`)
 This column contains composite codes (e.g., `NTC_BKH_SAL`, `BH_BKNH_NON_SAL`). Use `LIKE` patterns to decode.
 
 **Customer Segment**:
-- **New To Credit (NTC)**: `SCORECARD_MODEL_BRE__c LIKE 'NTC_%'`
-- **Bureau Hit (Existing)**: `SCORECARD_MODEL_BRE__c LIKE 'BH_%'`
+- **New To Credit (NTC)**: `FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE 'NTC_%'`
+- **Bureau Hit (Existing)**: `FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE 'BH_%'`
 
 **Employment Type**:
-- **Salaried**: `SCORECARD_MODEL_BRE__c LIKE '%_SAL'`
-- **Non-Salaried**: `SCORECARD_MODEL_BRE__c LIKE '%_NON_SAL'`
+- **Salaried**: `FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_SAL'`
+- **Non-Salaried**: `FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_NON_SAL'`
 
 **Alternate Data Hits** (A "Hit" means the model was triggered - Result was either a Score OR a Reject):
-- **Banking Hit**: `SCORECARD_MODEL_BRE__c NOT LIKE '%_BKNH%'` (Includes `BKH` = Hit, `BKR` = Reject, `MBBKR` = Multi-Bureau Reject)
-- **PayU Hit**: `SCORECARD_MODEL_BRE__c LIKE '%_PH%'` (Hit) **OR** `SCORECARD_MODEL_BRE__c LIKE '%_PR%'` (Reject)
-- **GeoIQ Hit**: `SCORECARD_MODEL_BRE__c LIKE '%_GH%'` (Hit) **OR** `SCORECARD_MODEL_BRE__c LIKE '%_GR%'` (Reject)
+- **Banking Hit**: `FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%'` **OR** `FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%'` (Reject) (Includes `BKH` = Hit, `BKR` = Reject)
+- **PayU Hit**: `FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_PH%'` (Hit) **OR** `FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_PR%'` (Reject)
+- **GeoIQ Hit**: `FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_GH%'` (Hit) **OR** `FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_GR%'` (Reject)
 
 ### C. Risk Bands (Pre-Calculated - DO NOT Recalculate)
 **NEVER** use CASE WHEN to create bands. Use existing table columns:
@@ -139,7 +139,7 @@ This column contains composite codes (e.g., `NTC_BKH_SAL`, `BH_BKNH_NON_SAL`). U
 **Banking Hit Ratio**:
 ```sql
 ROUND(SAFE_DIVIDE(
-  COUNT(CASE WHEN SCORECARD_MODEL_BRE__c NOT LIKE '%_BKNH%' THEN 1 END), 
+  COUNT(CASE WHEN FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%' OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%' THEN 1 END), 
   COUNT(*)
 ), 4)
 ```
@@ -216,9 +216,9 @@ ORDER BY 1
 SELECT 
   dealer_name,
   COUNT(*) as total_apps,
-  COUNT(CASE WHEN SCORECARD_MODEL_BRE__c NOT LIKE '%_BKNH%' THEN 1 END) as banking_hits,
+  COUNT(CASE WHEN FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%' OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%' THEN 1 END) as banking_hits,
   ROUND(SAFE_DIVIDE(
-    COUNT(CASE WHEN SCORECARD_MODEL_BRE__c NOT LIKE '%_BKNH%' THEN 1 END),
+    COUNT(CASE WHEN FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%' OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%' THEN 1 END),
     COUNT(*)
   ), 4) as banking_hit_ratio
 FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.sourcing_table}`
