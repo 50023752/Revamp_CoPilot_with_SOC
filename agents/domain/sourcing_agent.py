@@ -353,7 +353,7 @@ ORDER BY month DESC
             # It handles `AS` keywords correctly, unlike the old regex script.
             clean_sql = sqlglot.transpile(
                 raw_sql, 
-                read=None, # Let sqlglot guess input dialect (usually accurate for standard SQL)
+                read="bigquery", # Let sqlglot guess input dialect (usually accurate for standard SQL)
                 write="bigquery", 
                 pretty=True
             )[0]

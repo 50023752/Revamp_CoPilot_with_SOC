@@ -274,26 +274,26 @@ class QueryExecutionAgent:
                 execution_time = (time.time() - start_time) * 1000
                     # Detect a common credential refresh symptom where the
                     # metadata response is a raw string instead of JSON
-                    msg = str(e)
-                    if isinstance(e, TypeError) and 'string indices must be integers' in msg:
-                        logger.error(
+                msg = str(e)
+                if isinstance(e, TypeError) and 'string indices must be integers' in msg:
+                    logger.error(
                             "Credential refresh failed: metadata response malformed. "
                             "Check GOOGLE_APPLICATION_CREDENTIALS or default credentials.",
                             exc_info=True
                         )
-                        hint = (
+                    hint = (
                             "Credential refresh failed while contacting metadata server. "
                             "If you're running locally, run `gcloud auth application-default login` or set "
                             "the `GOOGLE_APPLICATION_CREDENTIALS` env var to a valid service account JSON file."
                         )
-                        return SQLExecutionResponse(
+                    return SQLExecutionResponse(
                             status=ExecutionStatus.FAILED,
                             error_message=f"Credential refresh failed: {msg}. {hint}",
                             execution_time_ms=execution_time
                         )
 
-                    logger.error(f"Critical execution failure: {e}", exc_info=True)
-                    return SQLExecutionResponse(
+                logger.error(f"Critical execution failure: {e}", exc_info=True)
+                return SQLExecutionResponse(
                         status=ExecutionStatus.FAILED,
                         rows=[],
                         row_count=0,
