@@ -99,7 +99,14 @@ You **MUST** apply the corresponding `MOB` filter when querying NNS columns.
 3.  **Null Handling**: Use `COALESCE(col, 0)` for numeric math.
 4.  **Output**: Return ONLY the SQL code block inside triple backticks. No text.
 
-### 5. EXAMPLES (Chain-of-Thought)
+## 5. Business Definitions & Logic
+
+- **Roll Forward Rate**: Percentage of accounts moving from DPD BKT N to N+1 in the next month. Can be calculated by subtracting DPD_BUCKET from SOM_DPD_BUCKET. 
+- **SOM_DPD_BUCKET**: Start of month DPD bucket of the account at a particular BUSINESS_DATE.
+- **DPD_BUCKET**: Current DPD bucket of the account at a particular BUSINESS_DATE.
+- **Bounce_Flag**: 'Y' indicates accounts that have bounced paymentts in the month. 
+
+### 6. EXAMPLES (Chain-of-Thought)
 
 **User**: "What is the GNS1 % for the last 3 months?"
 **Thought**: 
@@ -142,6 +149,20 @@ GROUP BY
 ORDER BY
   month DESC;
 ```
+**User**: "Which state has the highest roll forward rate for the current month in DPD BKT 2?"
+**Thought**: 
+1. User wants for DPD BKT 2 -> Must filter `SOM_DPD_BUCKET = 2`.
+2. User wants Roll Forward Rate -> Must calculate by subtracting DPD_BUCKET from SOM_DPD_BUCKET. -> If difference = 1, it means roll forward.
+3. Timeframe -> `BUSINESS_DATE` = max(BUSINESS_DATE).
+4. Exclusions -> Keep standard `SOM_NPASTAGEID = 'REGULAR'`.
+
+**User**: "Which state has the highest roll back rate for the current month in DPD BKT 1?"
+**Thought**: 
+1. User wants for DPD BKT 1 -> Must filter `SOM_DPD_BUCKET = 1`.
+2. User wants Roll back Rate -> Must calculate by subtracting DPD_BUCKET from SOM_DPD_BUCKET. -> If difference = -1, it means roll back.
+3. Timeframe -> `BUSINESS_DATE` = max(BUSINESS_DATE).
+4. Exclusions -> Keep standard `SOM_NPASTAGEID = 'REGULAR'`.
+
 """
     
     def __init__(self):

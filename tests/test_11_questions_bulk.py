@@ -31,67 +31,85 @@ TEST_QUESTIONS = [
         "id": 1,
         "question": "What is GNS4 trend for last 4 months?",
         "expected_domain": "COLLECTIONS",
-        "category": "GNS_Metrics"
+        "category": "GNS_Metrics",
+        "expected_query_contains": ["Bounce_Flag = 'Y'", "MOB_ON_INSTL_START_DATE = 4", "BUSINESS_DATE"]
     },
     {
         "id": 2,
         "question": "Give me top 10 dealer names that have the highest NNS3 percentage and cases are more than 30 per dealer? Show the number of cases.",
         "expected_domain": "COLLECTIONS",
-        "category": "NNS_Metrics"
+        "category": "NNS_Metrics",
+        "expected_query_contains": ["NNS3 = 'Y'", "MOB_ON_INSTL_START_DATE = 3", "COUNT("]
     },
     {
         "id": 3,
         "question": "Share me the dealer which has the lowest banking hit ratio in applications?",
         "expected_domain": "SOURCING",
-        "category": "Banking_Metrics"
+        "category": "Banking_Metrics",
+        "expected_query_contains": ["FINAL_APPLICANT_SCORECARD_MODEL_BRE", "SAFE_DIVIDE", "Dealer_Name_Supplier__c"]
     },
     {
         "id": 4,
         "question": "Which state has the highest roll forward rate for the current month in DPD BKT 2?",
         "expected_domain": "COLLECTIONS",
-        "category": "Roll_Forward"
+        "category": "Roll_Forward",
+        "expected_query_contains": ["SOM_DPD_BUCKET", "DPD_BUCKET", "STATE"]
     },
     {
         "id": 5,
         "question": "SO which FLS in Gujrat state has the highest disbursement number in last month?",
         "expected_domain": "SOURCING",
-        "category": "Disbursement"
+        "category": "Disbursement",
+        "expected_query_contains": ["DISBURSALDATE", "FLS_Name__c", "SUM("]
     },
     {
         "id": 6,
-        "question": "Show me the DMI having highest RC pendency?",
+        "question": "What is the approval to disbursed cases for last 3 months for banking models?",
         "expected_domain": "SOURCING",
-        "category": "RC_Pendency"
+        "category": "Banking_Performance",
+        "expected_query_contains": ["DISBURSALDATE", "BRE_Sanction_Result__c", "SAFE_DIVIDE", 'FINAL_APPLICANT_SCORECARD_MODEL_BRE']
     },
     {
         "id": 7,
         "question": "Show me the performance of TVS XL model where loan amount < 60000?",
         "expected_domain": "COLLECTIONS",
-        "category": "Product_Performance"
+        "category": "Product_Performance",
+        "expected_query_contains": ["TVS XL", "ASSETMAKE", "AMOUNTFINANCE"]
     },
     {
         "id": 8,
         "question": "What is the disbursal trend of Superbikes?",
         "expected_domain": "SOURCING",
-        "category": "Disbursement"
+        "category": "Disbursement",
+        "expected_query_contains": ["Asset_Cost__c", "DISBURSALDATE", "SUM("]
     },
     {
         "id": 9,
         "question": "SHow me the bounce rate on 0 dpd for Assam?",
         "expected_domain": "COLLECTIONS",
-        "category": "Bounce_Rate"
+        "category": "Bounce_Rate",
+        "expected_query_contains": ["STATE", "Bounce_Flag", "Assam", "BUSINESS_DATE"]
     },
     {
         "id": 10,
         "question": "What is the rejection based on CIBIL score below 650?",
         "expected_domain": "SOURCING",
-        "category": "CIBIL_Rejection"
+        "category": "CIBIL_Rejection",
+        "expected_query_contains": ["CIBIL_SCORE_BAND", "REJECT", "650"]
     },
     {
         "id": 11,
         "question": "What is the rejection rate for applications where CIBIL score is between 300-650 in October 2025? Also list out the reason of rejections for these cases.",
         "expected_domain": "SOURCING",
-        "category": "CIBIL_Rejection"
+        "category": "CIBIL_Rejection",
+        "expected_query_contains": ["CIBIL_SCORE_BAND", "REJECT", "BRE_Reject_Reason__c", "LastModifiedDate"]
+    },
+    {
+        "id": 12,
+        "question": "What is the application login to approval to disbursed percentages for last 3 months, month on month?",
+        "expected_domain": "SOURCING",
+        "category": "login-approval-disbursed",
+        "expected_query_contains": ["DISBURSALDATE", "LastModifiedDate", "BRE_Reject_Reason__c"]
     }
 ]
 
@@ -189,7 +207,16 @@ async def run_single_test(question_data: Dict, run_number: int, session_id: str)
         # Determine success
         domain_correct = selected_domain.upper() == question_data["expected_domain"]
         sql_generated = bool(sql_query and sql_query.strip())
-        
+
+        # Pattern-based SQL correctness (optional)
+        expected_patterns = question_data.get('expected_query_contains', []) or []
+        sql_lower = sql_query.lower() if sql_query else ''
+        sql_correct = True
+        for pat in expected_patterns:
+            if pat.lower() not in sql_lower:
+                sql_correct = False
+                break
+
         return {
             "question_id": question_data["id"],
             "run_number": run_number,
@@ -198,12 +225,13 @@ async def run_single_test(question_data: Dict, run_number: int, session_id: str)
             "actual_domain": selected_domain,
             "domain_correct": domain_correct,
             "sql_generated": sql_generated,
+            "sql_correct": sql_correct,
             "sql_query": sql_query[:500] if sql_query else "",  # Truncate for storage
             "response_length": len(response_text),
             "duration_ms": duration_ms,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "category": question_data["category"],
-            "success": domain_correct and sql_generated
+            "success": domain_correct and sql_generated and sql_correct
         }
         
     except Exception as e:
@@ -280,11 +308,8 @@ async def run_bulk_test(num_runs: int = 100, save_to_bq: bool = True):
     df.to_csv(csv_path, index=False)
     logger.info(f"Results saved to: {csv_path}")
     
-    # Save summary to JSON
-    summary_path = project_root / f"tests/results/summary_{timestamp}.json"
-    with open(summary_path, 'w') as f:
-        json.dump(summary, f, indent=2)
-    logger.info(f"Summary saved to: {summary_path}")
+    # Summary JSON save skipped - CSV and BigQuery storage are sufficient
+    logger.info("Skipping JSON summary save; CSV and BigQuery outputs are retained.")
     
     # Print summary
     print("\n" + "="*80)

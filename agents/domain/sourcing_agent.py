@@ -121,17 +121,17 @@ This column contains composite codes (e.g., `NTC_BKH_SAL`, `BH_BKNH_NON_SAL`). U
 - **NTC Deciles**: Use column `NTC_ML_deciles_band`
 
 ### D. Dealer & Geography
-- **Dealer Name**: `dealer_name`
+- **Dealer Name**: `Dealer_Name_Supplier__c`
 - **Dealer Category**: `Supplier_Categorization__Credit_Team` (Values: Silver, Diamond, Bronze, Platinum, Gold)
-- **FLS (Front Line Staff)**: `fls_name`
-- **DMI (Dealer/Manager)**: Use DMI identifier for dealer manager metrics
-- **State**: `state`
+- **FLS (Front Line Staff)**: `FLS_Name__c` used to name the FLS and `FLS_ID__c` used to identify the FLS.
+- **Interest Rate**: `FINAL_IRR`
+- **Asset Price**: `Asset_Cost__c`
 
 ### E. Product & Asset
-- **Superbikes**: `asset_price > 400000`
-- **Model-specific**: Filter by exact `asset_model_name` (e.g., 'TVS XL')
-- **RC Pendency**: Applications where RC (Registration Certificate) is pending — filter by RC status fields
-
+- **Superbikes**: `Asset_Cost__c > 400000`
+- **Model-specific**: Filter by exact `Asset_Model__c` (e.g., 'TVS XL')
+- **Prime or Non Prime Segmentation**: Use column `CATEGORY_TYPE`
+- **Type of Product**: Use column `PRODUCT_TYPE` (e.g., 'SKL', 'SKL Pro', 'VIP PRO', 'Centum', 'SAL', 'NIP', 'VIP')
 ---
 
 ## 4. Common Calculation Patterns (Copy-Paste Ready)
@@ -181,7 +181,7 @@ FORMAT_DATE('%Y-%m', month)  -- 2025-10
 
 ## 5. Example SQL Structures
 
-**Q1: "What is the disbursal trend for Superbikes > 4 Lakhs in Oct 2025?"**
+**Q1: "What is the disbursal trend for Superbikes ?"**
 ```sql
 SELECT 
   DATE_TRUNC(DISBURSALDATE, DAY) as trend_date,
@@ -189,7 +189,7 @@ SELECT
   ROUND(SUM(amount) / 10000000, 2) as total_disbursed_cr
 FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.sourcing_table}`
 WHERE DISBURSALDATE >= '2025-10-01' AND DISBURSALDATE < '2025-11-01'
-  AND asset_price > 400000
+  AND Asset_Cost__c > 400000
 GROUP BY 1
 ORDER BY 1
 ```
@@ -214,7 +214,7 @@ ORDER BY 1
 **Q3: "Banking hit ratio by dealer for last month?"**
 ```sql
 SELECT 
-  dealer_name,
+  Dealer_Name_Supplier__c,
   COUNT(*) as total_apps,
   COUNT(CASE WHEN FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%' OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%' THEN 1 END) as banking_hits,
   ROUND(SAFE_DIVIDE(
