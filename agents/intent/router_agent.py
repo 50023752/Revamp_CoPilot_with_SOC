@@ -62,7 +62,7 @@ class IntentRouterAgent(BaseAgent):
                 'funnel', 'bre', 'sanction', 'manufacturer', 'dealer',
                 'branch', 'rejected', 'accepted', 'abnd', 'asset cost',
                 'login', 'logins', 'lead', 'leads', 'onboarding', 'CIBIL',
-                'scorecard', 'model performance', 'model_performance', 'cyclops',
+                'scorecard', 'cyclops',
             ],
             'patterns': [
                 r'\bapproval\s+rate\b',
@@ -121,6 +121,9 @@ Response: SOURCING
 
 Question: "What is the rejection rate for applications where CIBIL score is between 300-650 in October 2025? Also list out the reason of rejections for these cases"
 Response: SOURCING
+
+Question: "Show me the performance of TVS XL model where loan amount < 60000?"    
+Response: COLLECTIONS
 
 
 Now classify this question and return ONLY the domain name:"""
