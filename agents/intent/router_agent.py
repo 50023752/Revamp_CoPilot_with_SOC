@@ -43,10 +43,11 @@ class IntentRouterAgent(BaseAgent):
     ROUTING_RULES: ClassVar[Dict] = {
         DomainType.COLLECTIONS: {
             'keywords': [
-                'dpd', 'delinquency', 'delinquent', 'recovery', 'collection',
+                'DPD', 'delinquency', 'delinquent', 'recovery', 'collection',
                 'overdue', 'payment', 'outstanding', 'pos', 'portfolio',
-                'bucket', 'nns', 'gns', 'mob', '0+', '30+', '60+', '90+',
-                '120+', 'emi', 'installment', 'arrears'
+                'bucket', 'NNS', 'GNS', 'mob', '0+', '30+', '60+', '90+',
+                '120+', 'emi', 'installment', 'arrears', 'dpd', 'bounce', 
+                'bounce rate', 'Roll Forward', 'roll forward', 'roll backward',
             ],
             'patterns': [
                 r'\b\d+\+',      # Matches "0+", "30+"
@@ -60,7 +61,8 @@ class IntentRouterAgent(BaseAgent):
                 'apply', 'customer', 'segment', 'product', 'conversion',
                 'funnel', 'bre', 'sanction', 'manufacturer', 'dealer',
                 'branch', 'rejected', 'accepted', 'abnd', 'asset cost',
-                'login', 'logins', 'lead', 'leads', 'onboarding'
+                'login', 'logins', 'lead', 'leads', 'onboarding', 'CIBIL',
+                'scorecard', 'model performance', 'model_performance', 'cyclops',
             ],
             'patterns': [
                 r'\bapproval\s+rate\b',
@@ -104,6 +106,22 @@ Response: COLLECTIONS
 
 Question: "What is login to approval conversion rate in last 6 months?"
 Response: SOURCING
+
+Question: "Share me the dealer which has the lowest banking hit ratio in applications?	"
+Response: SOURCING
+
+Question: "Show me the bounce rate on 0 dpd for Assam?"
+Response: COLLECTIONS
+
+Question: "Give me top 10 dealer names that have the highest NNS3 percentage and cases are more than 30 per dealer? Show the number of cases"
+Response: COLLECTIONS
+
+Question: "What is the disbursal trend of Superbikes?"    
+Response: SOURCING
+
+Question: "What is the rejection rate for applications where CIBIL score is between 300-650 in October 2025? Also list out the reason of rejections for these cases"
+Response: SOURCING
+
 
 Now classify this question and return ONLY the domain name:"""
 

@@ -2,6 +2,9 @@
 Bulk Test Script - 11 Questions x 100 Runs
 Tests agent accuracy, consistency, and performance across key business questions
 """
+from dotenv import load_dotenv
+load_dotenv()
+
 import asyncio
 import sys
 from pathlib import Path
@@ -135,22 +138,48 @@ async def run_single_test(question_data: Dict, run_number: int, session_id: str)
                     for part in event.content.parts:
                         if hasattr(part, 'text') and part.text:
                             response_parts.append(part.text)
-            
-            # Extract domain
+
+            # Robust domain extraction
             if 'routing_response' in ctx.session.state:
                 data = ctx.session.state['routing_response']
-                if isinstance(data, dict):
-                    selected_domain = data.get('selected_domain', 'Unknown')
-                else:
-                    selected_domain = getattr(data, 'selected_domain', 'Unknown')
-                    if hasattr(selected_domain, 'value'):
-                        selected_domain = selected_domain.value
-            
-            # Extract SQL
+                try:
+                    sel = None
+                    if isinstance(data, dict):
+                        sel = data.get('selected_domain') or data.get('selected_domain', None)
+                    else:
+                        sel = getattr(data, 'selected_domain', None)
+
+                    # Enum -> value
+                    try:
+                        from enum import Enum as _Enum
+                        if isinstance(sel, _Enum):
+                            sel = sel.value
+                    except Exception:
+                        pass
+
+                    # Nested dict (edge cases)
+                    if isinstance(sel, dict):
+                        sel = sel.get('value') or sel.get('name') or sel.get('selected_domain')
+
+                    if isinstance(sel, str):
+                        selected_domain = sel
+                    elif hasattr(sel, 'value'):
+                        selected_domain = getattr(sel, 'value')
+                    elif sel is not None:
+                        selected_domain = str(sel)
+                except Exception:
+                    pass
+
+            # Robust SQL extraction
             if 'sql_generation_response' in ctx.session.state:
                 sql_data = ctx.session.state['sql_generation_response']
-                if isinstance(sql_data, dict):
-                    sql_query = sql_data.get('sql_query', '')
+                try:
+                    if isinstance(sql_data, dict):
+                        sql_query = sql_data.get('sql_query', '') or sql_data.get('sql', '') or sql_data.get('generated_sql', '')
+                    else:
+                        sql_query = getattr(sql_data, 'sql_query', '') or getattr(sql_data, 'generated_sql', '') or ''
+                except Exception:
+                    sql_query = ''
         
         end_time = datetime.now(timezone.utc)
         duration_ms = (end_time - start_time).total_seconds() * 1000
