@@ -66,25 +66,26 @@ Your task is to generate **100% accurate GoogleSQL** based on the User Question,
     - SQL: `WHERE SOM_NPASTAGEID = 'REGULAR' AND SOM_POS > 0`
 3.  **Zero DPD**: 
     - SQL: `WHERE SOM_DPD = 0`
-4.  **XBKT**: 
+4.  **XBKT (Regular accounts that just bounced)**: 
     - SQL: `WHERE Bounce_Flag = 'Y' AND SOM_DPD = 0`
 
 #### B. NNS & GNS Calculation Rules (CRITICAL)
-You **MUST** apply the corresponding `MOB` filter when querying NNS columns.
-- **NNS1** → `AND MOB_ON_INSTL_START_DATE = 1 AND NNS1 = 'Y'`
-- **NNS2** → `AND MOB_ON_INSTL_START_DATE = 2 AND NNS2 = 'Y'`
-- ... (Same logic for 3, 4, 5, 6)
-- **For GNS Only**: You must use Bounce_Flag and MOB_ON_INSTL_START_DATE filter for respective GNS
-  - **GNS1** → `WHERE MOB_ON_INSTL_START_DATE = 1 AND Bounce_Flag = 'Y'`
-  - **GNS2** → `WHERE MOB_ON_INSTL_START_DATE = 2 AND Bounce_Flag = 'Y'`
+You **MUST** apply the corresponding `MOB` filter when querying NNS/GNS columns.
+- **NNS[x]**: Filter `MOB_ON_INSTL_START_DATE = [x]` AND `NNS[x] = 'Y'`
+  - Example: **NNS1** → `MOB_ON_INSTL_START_DATE = 1 AND NNS1 = 'Y'`
+  - Example: **NNS2** → `MOB_ON_INSTL_START_DATE = 2 AND NNS2 = 'Y'`
+- **GNS[x]**: Filter `MOB_ON_INSTL_START_DATE = [x]` AND `Bounce_Flag = 'Y'` 
+  - Example: **GNS1** → `MOB_ON_INSTL_START_DATE = 1 AND Bounce_Flag = 'Y' 
+  - Example: **GNS2** → `MOB_ON_INSTL_START_DATE = 2 AND Bounce_Flag = 'Y' 
 
-#### C. Date Filtering (Time-Travel Rules)
+#### C. Date Filtering (Dynamic Anchoring)
 - **Column**: ALWAYS use `BUSINESS_DATE`.
-- **Current Portfolio** (Default if no date mentioned): 
+- **Current Portfolio**: 
   - SQL: `WHERE BUSINESS_DATE = (SELECT MAX(BUSINESS_DATE) FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.collections_table}`)`
-- **Relative Dates**:
-  - "Last 3 Months": `WHERE BUSINESS_DATE >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH)`
-  - "Last 6 Months": `WHERE BUSINESS_DATE >= DATE_SUB(CURRENT_DATE(), INTERVAL 6 MONTH)`
+- **Relative Dates (Safe Anchor)**:
+  - NEVER use `CURRENT_DATE()`. Always anchor to the max date in data.
+  - "Last 3 Months": `WHERE BUSINESS_DATE >= DATE_SUB((SELECT MAX(BUSINESS_DATE) FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.collections_table}`), INTERVAL 3 MONTH)`
+  - "Last 6 Months": `WHERE BUSINESS_DATE >= DATE_SUB((SELECT MAX(BUSINESS_DATE) FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.collections_table}`), INTERVAL 6 MONTH)`
 
 ### 3. VALUE MAPPINGS (Use EXACT Values)
 
@@ -97,71 +98,116 @@ You **MUST** apply the corresponding `MOB` filter when querying NNS columns.
 1.  **Dialect**: GoogleSQL (Standard SQL). Use backticks (\`) for table/column names.
 2.  **Safety**: If the user does NOT ask for an aggregation (COUNT/SUM), append `LIMIT 100`.
 3.  **Null Handling**: Use `COALESCE(col, 0)` for numeric math.
-4.  **Output**: Return ONLY the SQL code block inside triple backticks. No text.
+4.  **Efficiency**: Do not use `SELECT *`. Select only required columns.
+5.  **Output**: Return ONLY the SQL code block inside triple backticks. No text.
 
-## 5. Business Definitions & Logic
+### 5. BUSINESS LOGIC & DEFINITIONS
 
-- **Roll Forward Rate**: Percentage of accounts moving from DPD BKT N to N+1 in the next month. Can be calculated by subtracting DPD_BUCKET from SOM_DPD_BUCKET. 
-- **SOM_DPD_BUCKET**: Start of month DPD bucket of the account at a particular BUSINESS_DATE.
-- **DPD_BUCKET**: Current DPD bucket of the account at a particular BUSINESS_DATE.
-- **Bounce_Flag**: 'Y' indicates accounts that have bounced paymentts in the month. 
+| Concept | Definition / Logic |
+| :--- | :--- |
+| **Roll Forward (Worsening)** | Account moves to a higher bucket. <br>Formula: `(DPD_BUCKET - SOM_DPD_BUCKET) > 0` |
+| **Roll Back (Improvement)** | Account moves to a lower bucket. <br>Formula: `(DPD_BUCKET - SOM_DPD_BUCKET) < 0` |
+| **STABLE (Stay)** | Account stays in same bucket. <br>Formula: `(DPD_BUCKET - SOM_DPD_BUCKET) = 0` |
+| **NORMALIZATION (Moved to DPD_BUCKET = 0)** | Account moves to 0 DPD_BUCKET from any Bucket. <br>Formula: `DPD_BUCKET = 0` |
+| **SOM_DPD_BUCKET** | Start of month DPD bucket at a particular BUSINESS_DATE. |
+| **DPD_BUCKET** | Current DPD bucket at a particular BUSINESS_DATE. |
+| **Bounce_Flag** | 'Y' indicates accounts that bounced payments in the month. |
+| **MOB_ON_INSTL_START_DATE** | Month on Book since installment start date. |
+| **Vintage Analysis** | **Structure**: When asked for "Vintage Curves", you MUST Group By `DISBURSAL_DATE` (Truncated to Month) and `MOB_ON_INSTL_START_DATE`.<br>**Rate Calculation**: `SUM(NR_variable) / SUM(DR_variable)` (e.g. `SUM(NR_30_PLUS_6MOB) / SUM(DR_30_PLUS_6MOB)`) |
 
-### 6. EXAMPLES (Chain-of-Thought)
+### 6. FEW-SHOT EXAMPLES (Chain-of-Thought)
 
 **User**: "What is the GNS1 % for the last 3 months?"
 **Thought**: 
-1. User wants GNS1 -> Must apply `MOB_ON_INSTL_START_DATE = 1` AND `Bounce_Flag = 'Y'`.
-2. Timeframe -> `BUSINESS_DATE` >= last 3 months.
-3. Exclusions -> Keep standard `SOM_NPASTAGEID = 'REGULAR'`.
+1. **Metric**: GNS1 Rate. Numerator = Count(GNS1='Y' & Bounce='Y'). Denominator = Count(All Accounts).
+2. **Filters**: `MOB_ON_INSTL_START_DATE = 1` (Mandatory for GNS1). `SOM_NPASTAGEID = 'REGULAR'` (Standard exclusion).
+3. **Time**: Last 3 months relative to MAX date.
 **SQL**:
 ```sql
+DECLARE max_date DATE DEFAULT (SELECT MAX(BUSINESS_DATE) FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.collections_table}`);
+
 SELECT 
   DATE_TRUNC(BUSINESS_DATE, MONTH) as month,
   ROUND(SAFE_DIVIDE(
-    COUNT(DISTINCT CASE WHEN MOB_ON_INSTL_START_DATE = 1 AND Bounce_Flag = 'Y' AND GNS1 = 'Y' THEN AGREEMENTNO END),
-    COUNT(DISTINCT CASE WHEN MOB_ON_INSTL_START_DATE = 1 THEN AGREEMENTNO END)
+    COUNT(DISTINCT CASE WHEN Bounce_Flag = 'Y' THEN AGREEMENTNO END),
+    COUNT(DISTINCT AGREEMENTNO)
   ) * 100, 2) as gns1_percentage
 FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.collections_table}`
-WHERE WHERE BUSINESS_DATE >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH)
+WHERE BUSINESS_DATE >= DATE_SUB(max_date, INTERVAL 3 MONTH)
+  AND MOB_ON_INSTL_START_DATE = 1
   AND SOM_NPASTAGEID = 'REGULAR'
 GROUP BY 1
 ORDER BY 1 DESC
+```
 
 **User**: "What is the 0+ dpd count and percentage for last 6 months?"
 **Thought**: 
-1. User wants 0+ DPD-> Must apply `DPD > 0`.
-2. Timeframe -> `BUSINESS_DATE` >= last 6 months.
-3. Exclusions -> Keep standard `SOM_NPASTAGEID = 'REGULAR'`.
+1. **Metric**: 0+ DPD means `SOM_DPD > 0`.
+2. **Time**: Last 6 months relative to MAX date.
+3. **Exclusions**: Keep standard `SOM_NPASTAGEID = 'REGULAR'`.
 **SQL**:
 ```sql
+DECLARE max_date DATE DEFAULT (SELECT MAX(BUSINESS_DATE) FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.collections_table}`);
+
 SELECT
   DATE_TRUNC(BUSINESS_DATE, MONTH) AS month,
   COUNT(DISTINCT AGREEMENTNO) AS total_accounts,
   COUNT(DISTINCT CASE WHEN SOM_DPD > 0 THEN AGREEMENTNO END) AS col_0_plus_dpd_accounts,
   ROUND(SAFE_DIVIDE(COUNT(DISTINCT CASE WHEN SOM_DPD > 0 THEN AGREEMENTNO END), COUNT(DISTINCT AGREEMENTNO)) * 100, 2) AS col_0_plus_dpd_percentage
-FROM
-  `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_NOSTD_MART_HIST`
-WHERE
-  BUSINESS_DATE >= DATE_SUB(CURRENT_DATE(), INTERVAL 6 MONTH)
-  AND BUSINESS_DATE <= CURRENT_DATE()
-GROUP BY
-  month
-ORDER BY
-  month DESC;
+FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.collections_table}`
+WHERE BUSINESS_DATE >= DATE_SUB(max_date, INTERVAL 6 MONTH)
+  AND SOM_NPASTAGEID = 'REGULAR'
+GROUP BY month
+ORDER BY month DESC
 ```
-**User**: "Which state has the highest roll forward rate for the current month in DPD BKT 2?"
-**Thought**: 
-1. User wants for DPD BKT 2 -> Must filter `SOM_DPD_BUCKET = 2`.
-2. User wants Roll Forward Rate -> Must calculate by subtracting DPD_BUCKET from SOM_DPD_BUCKET. -> If difference = 1, it means roll forward.
-3. Timeframe -> `BUSINESS_DATE` = max(BUSINESS_DATE).
-4. Exclusions -> Keep standard `SOM_NPASTAGEID = 'REGULAR'`.
 
-**User**: "Which state has the highest roll back rate for the current month in DPD BKT 1?"
+**User**: "Which state had the highest roll forward rate in DPD Bucket 1 last month?"
 **Thought**: 
-1. User wants for DPD BKT 1 -> Must filter `SOM_DPD_BUCKET = 1`.
-2. User wants Roll back Rate -> Must calculate by subtracting DPD_BUCKET from SOM_DPD_BUCKET. -> If difference = -1, it means roll back.
-3. Timeframe -> `BUSINESS_DATE` = max(BUSINESS_DATE).
-4. Exclusions -> Keep standard `SOM_NPASTAGEID = 'REGULAR'`.
+1. **Population**: `SOM_DPD_BUCKET = 1`.
+2. **Logic**: Roll Forward means `DPD_BUCKET > SOM_DPD_BUCKET` (moved to 2, 3, etc).
+3. **Time**: `BUSINESS_DATE = Max Date`.
+**SQL**:
+```sql
+SELECT
+  STATE,
+  COUNT(DISTINCT CASE WHEN (DPD_BUCKET - SOM_DPD_BUCKET) > 0 THEN AGREEMENTNO END) as roll_forward_count,
+  COUNT(DISTINCT AGREEMENTNO) as total_bucket_1_count,
+  ROUND(SAFE_DIVIDE(
+    COUNT(DISTINCT CASE WHEN (DPD_BUCKET - SOM_DPD_BUCKET) > 0 THEN AGREEMENTNO END),
+    COUNT(DISTINCT AGREEMENTNO)
+  ) * 100, 2) as roll_forward_rate
+FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.collections_table}`
+WHERE BUSINESS_DATE = (SELECT MAX(BUSINESS_DATE) FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.collections_table}`)
+  AND SOM_DPD_BUCKET = 1
+  AND SOM_NPASTAGEID = 'REGULAR'
+GROUP BY STATE
+ORDER BY roll_forward_rate DESC
+LIMIT 5
+```
+
+**User**: "Which state has the highest normalization rate for the current month in DPD BKT 1?"
+**Thought**: 
+1. **Population**: `SOM_DPD_BUCKET = 1`.
+2. **Logic**: Normalization means `DPD_BUCKET = 0` (moved to 0).
+3. **Time**: `BUSINESS_DATE = Max Date`.
+**SQL**:
+```sql
+SELECT
+  STATE,
+  COUNT(DISTINCT CASE WHEN (DPD_BUCKET = 0) THEN AGREEMENTNO END) as normalization_count,
+  COUNT(DISTINCT AGREEMENTNO) as total_bucket_1_count,
+  ROUND(SAFE_DIVIDE(
+    COUNT(DISTINCT CASE WHEN (DPD_BUCKET = 0) THEN AGREEMENTNO END),
+    COUNT(DISTINCT AGREEMENTNO)
+  ) * 100, 2) as normalization_rate
+FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.collections_table}`
+WHERE BUSINESS_DATE = (SELECT MAX(BUSINESS_DATE) FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.collections_table}`)
+  AND SOM_DPD_BUCKET = 1
+  AND SOM_NPASTAGEID = 'REGULAR'
+GROUP BY STATE
+ORDER BY normalization_rate DESC
+LIMIT 5
+```
 
 """
     

@@ -110,7 +110,7 @@ This column contains composite codes (e.g., `NTC_BKH_SAL`, `BH_BKNH_NON_SAL`). U
 - **Non-Salaried**: `FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_NON_SAL'`
 
 **Alternate Data Hits** (A "Hit" means the model was triggered - Result was either a Score OR a Reject):
-- **Banking Hit**: `FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%'` **OR** `FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%'` (Reject) (Includes `BKH` = Hit, `BKR` = Reject)
+- **Banking Hit**: `FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%'` (Hit) **OR** `FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%'` (Reject) (Includes `BKH` = Hit, `BKR` = Reject)
 - **PayU Hit**: `FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_PH%'` (Hit) **OR** `FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_PR%'` (Reject)
 - **GeoIQ Hit**: `FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_GH%'` (Hit) **OR** `FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_GR%'` (Reject)
 

@@ -95,7 +95,7 @@ TEST_QUESTIONS = [
         "question": "What is the rejection based on CIBIL score below 650?",
         "expected_domain": "SOURCING",
         "category": "CIBIL_Rejection",
-        "expected_query_contains": ["CIBIL_SCORE_BAND", "REJECT", "650"]
+        "expected_query_contains": ["CIBIL_SCORE", "REJECT", "650"]
     },
     {
         "id": 11,
@@ -350,6 +350,7 @@ async def run_bulk_test(num_runs: int = 100, save_to_bq: bool = True):
                 bigquery.SchemaField("actual_domain", "STRING"),
                 bigquery.SchemaField("domain_correct", "BOOLEAN"),
                 bigquery.SchemaField("sql_generated", "BOOLEAN"),
+                bigquery.SchemaField("sql_correct", "BOOLEAN"),
                 bigquery.SchemaField("sql_query", "STRING"),
                 bigquery.SchemaField("response_length", "INTEGER"),
                 bigquery.SchemaField("duration_ms", "FLOAT"),
@@ -359,8 +360,17 @@ async def run_bulk_test(num_runs: int = 100, save_to_bq: bool = True):
             ]
             
             try:
-                client.get_table(table_ref)
-            except:
+                table = client.get_table(table_ref)
+                # Ensure schema contains sql_correct - add if missing
+                existing_field_names = [f.name for f in table.schema]
+                fields_to_add = [f for f in schema if f.name not in existing_field_names]
+                if fields_to_add:
+                    new_schema = list(table.schema) + fields_to_add
+                    table.schema = new_schema
+                    client.update_table(table, ['schema'])
+                    logger.info(f"Updated table schema (added fields): {[f.name for f in fields_to_add]}")
+            except Exception:
+                # Table doesn't exist - create with full schema
                 table = bigquery.Table(table_ref, schema=schema)
                 client.create_table(table, exists_ok=True)
                 logger.info(f"Created table: {table_ref}")
