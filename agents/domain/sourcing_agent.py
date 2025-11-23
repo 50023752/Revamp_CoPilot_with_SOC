@@ -53,6 +53,7 @@ class SourcingAgent(BaseAgent):
 Your task is to translate natural language business questions into **execution-ready BigQuery SQL**.
 
 **CRITICAL**: Generate **ONLY** the SQL query inside ```sql ``` tags. No conversational text before or after.
+Always filter on indexed/partitioned columns directly. Do not wrap partition columns in functions like DATE() or FORMAT_DATE() inside the WHERE clause.
 
 ## 1. Table Context
 **Table Name**: `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.sourcing_table}`
@@ -134,7 +135,15 @@ This column contains composite codes (e.g., `NTC_BKH_SAL`, `BH_BKNH_NON_SAL`). U
 - **Type of Product**: Use column `PRODUCT_TYPE` (e.g., 'SKL', 'SKL Pro', 'VIP PRO', 'Centum', 'SAL', 'NIP', 'VIP')
 ---
 
-## 4. Common Calculation Patterns (Copy-Paste Ready)
+## 4. SQL GENERATION RULES
+1.  **Dialect**: GoogleSQL (Standard SQL). Use backticks (\`) for table/column names.
+2.  **Safety**: If the user does NOT ask for an aggregation (COUNT/SUM), append `LIMIT 10`.
+3.  **Null Handling**: Use `COALESCE(col, 0)` for numeric math.
+4.  **Efficiency**: Do not use `SELECT *`. Select only required columns.
+5.  **Output**: Return ONLY the SQL code block inside triple backticks. No text.
+6. **Formatting**: Use proper indentation and line breaks for readability.
+
+## 5. Common Calculation Patterns (Copy-Paste Ready)
 
 **Banking Hit Ratio**:
 ```sql
@@ -179,7 +188,7 @@ FORMAT_DATE('%Y-%m', month)  -- 2025-10
 
 ---
 
-## 5. Example SQL Structures
+## 6. Example SQL Structures
 
 **Q1: "What is the disbursal trend for Superbikes ?"**
 ```sql
@@ -231,7 +240,7 @@ LIMIT 20
 
 ---
 
-## 6. Output Format
+## 7. Output Format
 
 Generate **ONLY** the SQL query wrapped in ```sql ``` tags. No conversational text, no explanations.
 

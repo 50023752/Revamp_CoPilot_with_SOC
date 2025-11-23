@@ -60,6 +60,14 @@ class SQLSafetyValidator:
         # Check for SQL comments that might hide malicious code
         if cls._contains_suspicious_comments(sql_query):
             return False, "Blocked: Query contains suspicious SQL comments"
+
+        # Allow scripting blocks (DECLARE/SET) if they are followed by a SELECT or WITH
+        # This handles BigQuery scripting where variables are declared before a SELECT.
+        # We only allow this pattern when a SELECT/ WITH exists later in the script.
+        if re.match(r"^\s*(DECLARE|SET)\b", sql_query, re.IGNORECASE):
+            if re.search(r"\b(select|with)\b", sql_query, re.IGNORECASE):
+                return True, None
+            return False, "Blocked: Scripting blocks must include a SELECT or WITH statement"
         
         # Check for blocked keywords
         for blocked_pattern in cls.BLOCKED_KEYWORDS:

@@ -236,13 +236,6 @@ WHERE BUSINESS_DATE = (SELECT MAX(BUSINESS_DATE) FROM `analytics-datapipeline-pr
 GROUP BY STATE
 ORDER BY roll_forward_rate DESC
 LIMIT 5"
-,,,
-,,,
-,,,
-,,,
-,,,
-,,,
-,,,
 11,What is the current 90+ DPD percentage for the entire portfolio?,Collections,"SELECT
   BUSINESS_DATE as snapshot_date,
   SUM(POS) as total_pos,
