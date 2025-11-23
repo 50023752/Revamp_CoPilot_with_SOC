@@ -19,6 +19,7 @@ load_dotenv()
 from google.cloud import bigquery
 from google import genai
 from google.genai import types
+from google.auth import default as google_auth_default
 from google.adk.sessions import InMemorySessionService
 from google.adk.agents import InvocationContext, RunConfig
 from google.genai.types import Content, Part
@@ -55,9 +56,20 @@ except ImportError as e:
 class SemanticDataJudge:
     def __init__(self):
         # Use the same SDK as your project
-        location = getattr(settings, 'location', 'us-central1')
-        self.client = genai.Client(vertexai=True, project=settings.gcp_project_id, location=location)
-        self.model_name = "gemini-1.5-flash-002" # Efficient Judge Model
+        location = getattr(settings, 'vertex_ai_location', 'us-central1')
+        # Prefer explicit API key if provided (AI Studio), else use vertexai client
+        api_key = getattr(settings, 'google_api_key', None)
+        if api_key:
+            # AI Studio style client using API key
+            try:
+                self.client = genai.Client(api_key=api_key)
+            except Exception:
+                self.client = genai.Client(vertexai=True, project=settings.gcp_project_id, location=location)
+        else:
+            self.client = genai.Client(vertexai=True, project=settings.gcp_project_id, location=location)
+
+        # Model from settings (falls back to default in settings.py)
+        self.model_name = getattr(settings, 'gemini_pro_model', 'gemini-2.5-pro')
         
     def evaluate(self, question: str, df_ref: pd.DataFrame, df_bot: pd.DataFrame) -> Tuple[bool, str]:
         """
@@ -120,13 +132,23 @@ class SemanticDataJudge:
                     temperature=0.0
                 )
             )
-            
-            # Robust parsing
+
+            # Robust parsing for different response shapes
+            raw_text = None
+            if hasattr(response, 'text'):
+                raw_text = response.text
+            elif hasattr(response, 'output_text'):
+                raw_text = response.output_text
+            elif isinstance(response, str):
+                raw_text = response
+            else:
+                # Try to stringify
+                raw_text = str(response)
+
             try:
-                result = json.loads(response.text)
-            except:
-                # Fallback for markdown code blocks
-                clean_text = response.text.replace('```json', '').replace('```', '').strip()
+                result = json.loads(raw_text)
+            except Exception:
+                clean_text = raw_text.replace('```json', '').replace('```', '').strip()
                 result = json.loads(clean_text)
 
             return result.get("match", False), f"LLM Judge: {result.get('reason', 'Unknown')}"
@@ -292,6 +314,50 @@ async def run_stress_test(runs: int = 20):
         return
 
     df_gold = pd.read_csv(file_name)
+    # Preflight BigQuery credentials check
+    def _bq_credentials_preflight():
+        # Prefer explicit service account file
+        gac_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
+        if gac_path:
+            if not os.path.exists(gac_path):
+                print(f"{Fore.RED}❌ GOOGLE_APPLICATION_CREDENTIALS is set but file not found: {gac_path}{Style.RESET_ALL}")
+                print("Set the env var to a valid service-account JSON or run 'gcloud auth application-default login'.")
+                return False
+            else:
+                logger.info("Using GOOGLE_APPLICATION_CREDENTIALS: %s", gac_path)
+        else:
+            logger.info("GOOGLE_APPLICATION_CREDENTIALS not set; will attempt Application Default Credentials (ADC).")
+            print("If running locally, run: gcloud auth application-default login")
+
+        # Try to get default credentials to surface obvious errors early
+        try:
+            creds, project = google_auth_default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+            logger.info("Detected credentials type: %s", type(creds))
+        except Exception as e:
+            print(f"{Fore.RED}❌ Failed to obtain Google credentials: {e}{Style.RESET_ALL}")
+            print("Remediation: set GOOGLE_APPLICATION_CREDENTIALS to a service-account JSON file, or run 'gcloud auth application-default login'.")
+            return False
+
+        # Try a minimal BigQuery call to detect metadata-server parsing problems
+        try:
+            test_client = bigquery.Client(project=settings.gcp_project_id)
+            # lightweight call
+            list(test_client.list_datasets(max_results=1))
+            logger.info("BigQuery credentials appear functional for project %s", settings.gcp_project_id)
+            return True
+        except Exception as e:
+            print(f"{Fore.RED}❌ BigQuery credential check failed: {e}{Style.RESET_ALL}")
+            print("Common fixes:")
+            print(" - If running locally, run: gcloud auth application-default login")
+            print(" - Or set GOOGLE_APPLICATION_CREDENTIALS to a service-account JSON file with BigQuery roles")
+            print(" - Ensure service account has BigQuery Job User and BigQuery Data Editor roles")
+            return False
+
+    ok = _bq_credentials_preflight()
+    if not ok:
+        print(f"{Fore.RED}Aborting stress test due to BigQuery credential problems{Style.RESET_ALL}")
+        return
+
     executor = BigQueryExecutor(settings.gcp_project_id)
     judge = SemanticDataJudge()
     
@@ -300,6 +366,13 @@ async def run_stress_test(runs: int = 20):
 
     print(f"{Fore.CYAN}🔥 Starting Stress Test: {len(df_gold)} Questions x {runs} Runs{Style.RESET_ALL}")
     print(f"📝 Batch ID: {batch_id}\n")
+
+    # Preflight diagnostics
+    try:
+        model_name = getattr(settings, 'gemini_pro_model', None)
+        print(f"⚙️  Preflight: Project={settings.gcp_project_id} Dataset={settings.logging_dataset} JudgeModel={model_name}")
+    except Exception:
+        print("⚠️  Preflight: Could not read settings for project/dataset/model")
 
     for idx, (index, row) in enumerate(df_gold.iterrows(), start=1):
         qid = int(idx)
