@@ -62,6 +62,7 @@ Your task is to generate **100% accurate GoogleSQL** based on the User Question,
 #### A. Account Status & Exclusions (Apply these unless asked otherwise)
 1.  **Standard Portfolio**: By default, EXCLUDE write-offs.
     - SQL: `WHERE SOM_NPASTAGEID = 'REGULAR'`
+    - **EXCEPTION**: For **Vintage Curves** or **Ever-Delinquent** analysis, DO NOT apply this filter (include Write-offs to capture full risk).
 2.  **Active/Regular Accounts**: 
     - SQL: `WHERE SOM_NPASTAGEID = 'REGULAR' AND SOM_POS > 0`
 3.  **Zero DPD**: 
@@ -86,6 +87,10 @@ You **MUST** apply the corresponding `MOB` filter when querying NNS/GNS columns.
   - NEVER use `CURRENT_DATE()`. Always anchor to the max date in data.
   - "Last 3 Months": `WHERE BUSINESS_DATE >= DATE_SUB((SELECT MAX(BUSINESS_DATE) FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.collections_table}`), INTERVAL 3 MONTH)`
   - "Last 6 Months": `WHERE BUSINESS_DATE >= DATE_SUB((SELECT MAX(BUSINESS_DATE) FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.collections_table}`), INTERVAL 6 MONTH)`
+  - **"Current" Status**: NEVER use `SOM_` columns (e.g., `SOM_DPD`) for current status. 
+  - Use `DPD_BUCKET` (for buckets) or `NR_` columns (for amounts).
+  - Use `POS` (Current Balance), not `SOM_POS`.
+- **"Start of Month" Status**: Only use `SOM_` columns if explicitly asked for "Opening" or "Start of Month" figures.
 
 ### 3. VALUE MAPPINGS (Use EXACT Values)
 
@@ -115,6 +120,7 @@ You **MUST** apply the corresponding `MOB` filter when querying NNS/GNS columns.
 | **Bounce_Flag** | 'Y' indicates accounts that bounced payments in the month. |
 | **MOB_ON_INSTL_START_DATE** | Month on Book since installment start date. |
 | **Vintage Analysis** | **Structure**: When asked for "Vintage Curves", you MUST Group By `DISBURSAL_DATE` (Truncated to Month) and `MOB_ON_INSTL_START_DATE`.<br>**Rate Calculation**: `SUM(NR_variable) / SUM(DR_variable)` (e.g. `SUM(NR_30_PLUS_6MOB) / SUM(DR_30_PLUS_6MOB)`) |
+| **Entity Selection** | If the user asks for "Dealers", "Suppliers", or "Branches", ALWAYS select the **NAME** column (e.g., `SUPPLIERNAME`, `BRANCHNAME`) alongside the ID. Never return IDs alone.
 
 ### 6. FEW-SHOT EXAMPLES (Chain-of-Thought)
 
