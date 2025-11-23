@@ -125,8 +125,6 @@ You **MUST** apply the corresponding `MOB` filter when querying NNS/GNS columns.
 3. **Time**: Last 3 months relative to MAX date.
 **SQL**:
 ```sql
-DECLARE max_date DATE DEFAULT (SELECT MAX(BUSINESS_DATE) FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.collections_table}`);
-
 SELECT 
   DATE_TRUNC(BUSINESS_DATE, MONTH) as month,
   ROUND(SAFE_DIVIDE(
@@ -134,7 +132,7 @@ SELECT
     COUNT(DISTINCT AGREEMENTNO)
   ) * 100, 2) as gns1_percentage
 FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.collections_table}`
-WHERE BUSINESS_DATE >= DATE_SUB(max_date, INTERVAL 3 MONTH)
+WHERE BUSINESS_DATE >= DATE_SUB((SELECT MAX(BUSINESS_DATE) FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.collections_table}`), INTERVAL 3 MONTH)
   AND MOB_ON_INSTL_START_DATE = 1
   AND SOM_NPASTAGEID = 'REGULAR'
 GROUP BY 1
@@ -148,15 +146,13 @@ ORDER BY 1 DESC
 3. **Exclusions**: Keep standard `SOM_NPASTAGEID = 'REGULAR'`.
 **SQL**:
 ```sql
-DECLARE max_date DATE DEFAULT (SELECT MAX(BUSINESS_DATE) FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.collections_table}`);
-
 SELECT
   DATE_TRUNC(BUSINESS_DATE, MONTH) AS month,
   COUNT(DISTINCT AGREEMENTNO) AS total_accounts,
   COUNT(DISTINCT CASE WHEN SOM_DPD > 0 THEN AGREEMENTNO END) AS col_0_plus_dpd_accounts,
   ROUND(SAFE_DIVIDE(COUNT(DISTINCT CASE WHEN SOM_DPD > 0 THEN AGREEMENTNO END), COUNT(DISTINCT AGREEMENTNO)) * 100, 2) AS col_0_plus_dpd_percentage
 FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.collections_table}`
-WHERE BUSINESS_DATE >= DATE_SUB(max_date, INTERVAL 6 MONTH)
+WHERE BUSINESS_DATE >= DATE_SUB((SELECT MAX(BUSINESS_DATE) FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.collections_table}`), INTERVAL 6 MONTH)
   AND SOM_NPASTAGEID = 'REGULAR'
 GROUP BY month
 ORDER BY month DESC
@@ -210,6 +206,30 @@ ORDER BY normalization_rate DESC
 LIMIT 5
 ```
 
+**User**: "Show me the Vintage Curve for 30+ Delinquency for loans disbursed Jan-Mar 2024 at MOB 3 and 6." 
+**Thought**:
+1. **Population**: Loans disbursed between '2024-01-01' and '2024-03-31'.
+2. **Logic**: Analysis Type: Vintage Analysis. MUST group by Disbursal Month.
+3. **Formula**: Use Pre-calculated Denominator (DR_) and Numerator (NR_) columns.
+4. **Filters**: Disbursal Date range. BUSINESS_DATE = Max Date (Latest Snapshot containing the history).
+
+**SQL**:
+```sql
+SELECT
+  DATE_TRUNC(DISBURSALDATE, MONTH) as disbursal_month,
+  -- MOB 3 Rate
+  ROUND(SAFE_DIVIDE(SUM(NR_30_PLUS_3MOB), SUM(DR_30_PLUS_3MOB)) * 100, 2) as mob_3_rate,
+  -- MOB 6 Rate
+  ROUND(SAFE_DIVIDE(SUM(NR_30_PLUS_6MOB), SUM(DR_30_PLUS_6MOB)) * 100, 2) as mob_6_rate,
+  -- MOB 9 Rate
+  ROUND(SAFE_DIVIDE(SUM(NR_30_PLUS_9MOB), SUM(DR_30_PLUS_9MOB)) * 100, 2) as mob_9_rate,
+  -- MOB 12 Rate
+  ROUND(SAFE_DIVIDE(SUM(NR_30_PLUS_12MOB), SUM(DR_30_PLUS_12MOB)) * 100, 2) as mob_12_rate
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+WHERE DISBURSALDATE BETWEEN '2024-01-01' AND '2024-03-31'
+GROUP BY 1
+ORDER BY 1;
+```
 """
     
     def __init__(self):
