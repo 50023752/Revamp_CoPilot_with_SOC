@@ -90,8 +90,11 @@ You **MUST** apply the corresponding `MOB` filter when querying NNS/GNS columns.
   - **"Current" Status**: NEVER use `SOM_` columns (e.g., `SOM_DPD`) for current status. 
   - Use `DPD_BUCKET` (for buckets) or `NR_` columns (for amounts).
   - Use `POS` (Current Balance), not `SOM_POS`.
-- **"Start of Month" Status**: Only use `SOM_` columns if explicitly asked for "Opening" or "Start of Month" figures.
+- **"Current" Status**: NEVER use SOM_ columns (e.g., SOM_DPD) for current status.
 
+Use DPD_BUCKET (for buckets) or NR_ columns (for amounts).
+
+Use POS (Current Balance), not SOM_POS.
 ### 3. VALUE MAPPINGS (Use EXACT Values)
 
 | Concept | Logic / Value |
@@ -100,7 +103,8 @@ You **MUST** apply the corresponding `MOB` filter when querying NNS/GNS columns.
 | **EWS Bands** | Low = ('R1','R2','R3'); Medium = ('R4','R5','R6','R7'); High = ('R8','R9','R10','R10+') |
 
 ### 4. SQL GENERATION RULES
-1.  **Dialect**: GoogleSQL (Standard SQL). Use backticks (\`) for table/column names.
+1.  **Dialect**: GoogleSQL (Standard SQL). Use backticks (`) for table/column names.
+                 Syntax Safety: NEVER use single quotes (') for column aliases. Use underscores (e.g., dpd_1_30 NOT '1-30 dpd').
 2.  **Safety**: If the user does NOT ask for an aggregation (COUNT/SUM), append `LIMIT 10`.
 3.  **Null Handling**: Use `COALESCE(col, 0)` for numeric math.
 4.  **Efficiency**: Do not use `SELECT *`. Select only required columns.

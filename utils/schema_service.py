@@ -393,82 +393,12 @@ class SchemaService:
     
     def get_schema_with_business_rules(self, dataset_id: str, table_id: str) -> str:
         """
-        Get semantic schema PLUS embedded business rules and common filters
-        This combines semantic schema + actionable business rules for SQL generation
+        Get semantic schema (business rules are in domain agent prompts)
+        Returns only the semantic schema - business logic is embedded in agent instructions
         """
-        semantic = self.get_semantic_schema(dataset_id, table_id)
-        
-        # Add business rules section
-        business_rules = """
-
----
-
-## 📖 Common Business Rules & Filters
-
-### Performance Cohort Definitions
-- **3-Month Cohort**: Accounts that have completed 3 months from installment start → `WHERE MOB_3M_Flag = 1`
-- **6-Month Cohort**: Accounts that have completed 6 months from installment start → `WHERE MOB_6M_Flag = 1`
-- **12-Month Cohort**: Accounts that have completed 12 months from installment start → `WHERE MOB_12M_Flag = 1`
-
-### GNS/NNS Calculations (CRITICAL - Must Filter by MOB)
-- **GNS1 (Gross Non-Starter at 1st EMI)**: 
-  - ONLY VALID for `MOB_ON_INSTL_START_DATE = 1`
-  - Count: `COUNT(CASE WHEN GNS1 = 'Y' THEN AGREEMENTNO END) WHERE MOB_ON_INSTL_START_DATE = 1`
-  
-- **NNS1 (Net Non-Starter at 1st EMI)**:
-  - ONLY VALID for `MOB_ON_INSTL_START_DATE = 1`
-  - Count: `COUNT(CASE WHEN NNS1 = 'Y' THEN AGREEMENTNO END) WHERE MOB_ON_INSTL_START_DATE = 1`
-
-- **GNS2, GNS3, GNS4, GNS5, GNS6** → Filter by `MOB_ON_INSTL_START_DATE = 2, 3, 4, 5, 6` respectively
-- **NNS2, NNS3, NNS4, NNS5, NNS6** → Filter by `MOB_ON_INSTL_START_DATE = 2, 3, 4, 5, 6` respectively
-
-### DPD Bucket Grouping (EXACT Buckets - Do Not Modify)
-When using `SOM_DPD_BUCKET` or `DPD_BUCKET`, use EXACTLY these buckets:
-- '0' → Current (0 DPD)
-- '1' → 1-30 days past due
-- '2' → 31-60 days past due
-- '3' → 61-90 days past due
-- '4' → 91-120 days past due (NPA threshold is 90+)
-- '5' → 120+ days past due (NPA threshold is 90+)
-
-### EWS Model Output Banding (EXACT Groups - Do Not Modify)
-When using `EWS_Model_Output_Band`, group values into EXACTLY these bands:
-- 'Low' → R1, R2, R3
-- 'Medium' → R4, R5, R6, R7
-- 'High' → R8, R9, R10 and above
-
-### Common Filter Conditions
-- **Exclude Written-Off**: `WHERE NPASTAGEID != 'WO_SALE' OR NPASTAGEID IS NULL`
-- **Exclude Deceased**: `WHERE NPASTAGEID != 'DECEASED' OR NPASTAGEID IS NULL`
-- **Active Regular Accounts**: `WHERE SOM_NPASTAGEID = 'REGULAR'`
-- **Current Portfolio Snapshot**: `WHERE BUSINESS_DATE = (SELECT MAX(BUSINESS_DATE) FROM table)`
-- **Zero DPD Accounts**: `WHERE SOM_DPD = 0`
-- **0+ DPD (Delinquent)**: `WHERE SOM_DPD > 0`
-- **30+ DPD**: `WHERE SOM_DPD > 30`
-- **60+ DPD**: `WHERE SOM_DPD > 60`
-- **90+ DPD (NPA)**: `WHERE SOM_DPD > 90`
-
-### Time Aggregation Patterns
-- **By Month**: `GROUP BY DATE_TRUNC(BUSINESS_DATE, MONTH) as month` then `ORDER BY month DESC`
-- **By Branch**: `GROUP BY BRANCHNAME, REGION` for geographic analysis
-- **By Product**: `GROUP BY PRODUCTNAME` for product-level metrics
-
-### Common KPI Formulas
-- **0+ DPD Percentage**: `ROUND(SAFE_DIVIDE(COUNT(CASE WHEN SOM_DPD > 0 THEN 1 END), COUNT(*)) * 100, 2)`
-- **GNS1 Percentage**: `ROUND(SAFE_DIVIDE(COUNT(CASE WHEN GNS1 = 'Y' THEN 1 END), COUNT(*)) * 100, 2)` 
-  (WITH filter `WHERE MOB_ON_INSTL_START_DATE = 1`)
-- **NNS1 Percentage**: `ROUND(SAFE_DIVIDE(COUNT(CASE WHEN NNS1 = 'Y' THEN 1 END), COUNT(*)) * 100, 2)`
-  (WITH filter `WHERE MOB_ON_INSTL_START_DATE = 1`)
-- **Recovery Rate**: `SAFE_DIVIDE(EMI_COLLECTION + ODC_COLLECTION + CBC_COLLECTION, TOTAL_CHARGES_DUE) * 100`
-
-### Date Filtering Patterns
-- **Last N Months**: `WHERE BUSINESS_DATE >= DATE_SUB(CURRENT_DATE(), INTERVAL N MONTH)`
-- **Current Month**: `WHERE DATE_TRUNC(BUSINESS_DATE, MONTH) = DATE_TRUNC(CURRENT_DATE(), MONTH)`
-- **Since Disbursal**: `WHERE BUSINESS_DATE >= DATE(DISBURSALDATE)`
-- **Before Maturity**: `WHERE BUSINESS_DATE <= DATE(MATURITYDATE)`
-"""
-        
-        return semantic + business_rules
+        # Business rules and KPI formulas are now in the domain agent prompts
+        # to avoid duplication and token waste. This method returns semantic schema only.
+        return self.get_semantic_schema(dataset_id, table_id)
     
     def clear_cache(self):
         """Clear the schema cache"""
