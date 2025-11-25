@@ -242,7 +242,25 @@ class BigQueryExecutor:
             if not errors:
                 logger.info(f"✅ Logged {len(clean_results)} records to BigQuery ({table_id})")
             else:
-                logger.error(f"BQ Insert Errors: {errors}")
+                # Write detailed error dump for analysis
+                try:
+                    ts = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
+                    err_path = os.path.join(os.getcwd(), f"tests/bq_insert_errors_{ts}.json")
+                    os.makedirs(os.path.dirname(err_path), exist_ok=True)
+                    with open(err_path, 'w', encoding='utf-8') as ef:
+                        json.dump({"errors": errors, "rows": clean_results}, ef, default=str, indent=2)
+                    logger.error(f"BQ Insert Errors written to: {err_path}")
+                except Exception:
+                    logger.exception("Failed to write BQ insert error dump")
+
+                # Attempt fallback: load_table_from_dataframe (handles schema differences better)
+                try:
+                    df_fallback = pd.DataFrame(clean_results)
+                    load_job = self.client.load_table_from_dataframe(df_fallback, table_ref)
+                    load_job.result()  # wait
+                    logger.info(f"✅ Fallback load_table_from_dataframe succeeded for {len(df_fallback)} rows into {table_ref}")
+                except Exception as le:
+                    logger.error(f"Fallback dataframe load also failed: {le}")
         except Exception as e:
             logger.warning(f"BQ Log Error: {e}")
 
