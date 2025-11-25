@@ -217,7 +217,6 @@ LIMIT 5"
   ) * 100, 2) as dpd_90_plus_percentage
 FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
 WHERE BUSINESS_DATE = (SELECT MAX(BUSINESS_DATE) FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`)
-  AND SOM_NPASTAGEID = 'REGULAR'
 group by BUSINESS_DATE"
 12,"Show me the Vintage Curve for 30+ Delinquency for loans disbursed in Jan 2024, Feb 2024, and Mar 2024? At MOB = 3, 6, 9, 12.",Collections,,"SELECT
   DATE_TRUNC(DISBURSALDATE, MONTH) as disbursal_month,

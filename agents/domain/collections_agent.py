@@ -99,15 +99,22 @@ You **MUST** apply the corresponding `MOB` filter when querying NNS/GNS columns.
   - Use `DPD_BUCKET` (for buckets) or `NR_` columns (for amounts).
   - Use `POS` (Current Balance), not `SOM_POS`.
 - **"Current" Status**: NEVER use SOM_ columns (e.g., SOM_DPD) for current status.
+                        Use DPD_BUCKET (for buckets) or NR_ columns (for amounts).
+                        Use POS (Current Balance), not SOM_POS.
 
-Use DPD_BUCKET (for buckets) or NR_ columns (for amounts).
+### Section 3: VALUE MAPPINGS & PRE-CALCULATED COLUMNS: 
+# CRITICAL: Priority on Pre-Calculated Columns If a user asks for a metric that exists as a pre-calculated column (like 90+ DPD or MOB Performance), ALWAYS use the columns below. Do not attempt to calculate these from raw row-level logic.
 
-Use POS (Current Balance), not SOM_POS.
-### 3. VALUE MAPPINGS (Use EXACT Values)
+# 90+ DPD Risk (Current Snapshot)	
+Numerator: SUM(NR_90_PLUS)
+Denominator: SUM(POS)
+Rule: Corresponds to Scenario B (Risk Analysis). Do NOT filter 'REGULAR'.
 
-| Concept | Logic / Value |
-| :--- | :--- |
-| **DPD Buckets** | 0 (0dpd), 1 (1-30), 2 (31-60), 3 (61-90), 4+ (91+) | Filter using `DPD_BUCKET > 3` for 90+ DPD queries. |
+# Vintage & MOB Specifics (e.g., "Vintage Curve", "Performance at MOB 3", "30+ at MOB 6")
+Formula: SUM(NR_30_PLUS_[x]MOB) / SUM(DR_30_PLUS_[x]MOB)
+Logic: The NR_ column is the Numerator (Risk Amount). The DR_ column is the Denominator (Disbursed Amount).
+Available MOBs: 3, 6, 9, 12.
+| **DPD Buckets** |	0 (0dpd), 1 (1-30), 2 (31-60), 3 (61-90), 4+ (91+)
 | **EWS Bands** | Low = ('R1','R2','R3'); Medium = ('R4','R5','R6','R7'); High = ('R8','R9','R10','R10+') |
 
 ### 4. SQL GENERATION RULES
@@ -122,6 +129,9 @@ Use POS (Current Balance), not SOM_POS.
                         Bad: WHERE STATE = 'Assam'
                         Good: WHERE UPPER(STATE) = 'ASSAM'
 8.  **Completeness**: If the user asks for multiple specific metrics (e.g., "MOB 3, 6, 9, 12"), you MUST calculate and return columns for ALL requested values. Do not skip any.
+9.  **Structure**: Use Common Table Expressions (WITH clauses) for date anchoring. Avoid complex subqueries in the WHERE clause or CROSS JOINs if possible.
+    Bad: SELECT ... FROM Table CROSS JOIN (SELECT MAX(Date)...)
+    Good: WITH MaxDate AS (SELECT MAX(BUSINESS_DATE) as dt FROM Table) SELECT ... FROM Table t JOIN MaxDate m ON t.BUSINESS_DATE = m.dt
 
 
 ### 5. BUSINESS LOGIC & DEFINITIONS
@@ -253,6 +263,24 @@ WHERE DISBURSALDATE BETWEEN '2024-01-01' AND '2024-03-31'
 GROUP BY 1
 ORDER BY 1;
 ```
+User: "How is the portfolio performing at MOB 3 for 30+ delinquency?" Thought:
+Intent: Direct MOB Performance inquiry.
+Mapping Check: The user asked for "MOB 3" and "30+ DPD".
+Variable Selection: I must use the pre-calculated pair NR_30_PLUS_3MOB and DR_30_PLUS_3MOB.
+Formula: Rate = Sum(Numerator) / Sum(Denominator). SQL:
+
+SELECT
+  DATE_TRUNC(BUSINESS_DATE, MONTH) as disbursal_month,
+  -- Direct calculation using pre-defined mart columns
+  ROUND(SAFE_DIVIDE(
+    SUM(NR_30_PLUS_3MOB), 
+    SUM(DR_30_PLUS_3MOB)
+  ) * 100, 2) as mob_3_delinquency_percentage
+FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.collections_table}`
+WHERE WHERE BUSINESS_DATE = (SELECT MAX(BUSINESS_DATE) FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.collections_table}`)
+GROUP BY 1
+ORDER BY 1
+
 """
     
     def __init__(self):

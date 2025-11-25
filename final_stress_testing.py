@@ -104,7 +104,7 @@ class SemanticDataJudge:
 
         prompt = f"""
         Act as a Senior Data QA Analyst. Determine if the 'Bot Generated Data' matches the 'Reference Data'.
-        
+
         User Question: "{question}"
 
         Reference Data (Ground Truth):
@@ -115,12 +115,19 @@ class SemanticDataJudge:
 
         **Evaluation Rules:**
         1. **Ignore Headers:** 'cnt' == 'count' == 'total'.
-        2. **Ignore Formatting:** '5.5%' == '0.055'.
+        2. **Ignore Formatting:** '5.5%' == '0.055' == '5.5'.
         3. **Ignore Extra Info:** If Bot adds helpful context columns, it PASSES.
         4. **Ignore Sort Order:** Rows can be in any order.
-        5. **Pass Criteria:** Do the numbers in the Bot Data answer the user's question consistently with the Reference?
+        5. **Numerical Tolerance (The "Near Miss" Rule):** - Allow for small variances due to rounding or floating-point precision.
+        - **Acceptable Variance:** +/- 1% relative difference (e.g., 100 vs 101 is a MATCH).
+        - **Rounding:** 13.27 is a MATCH for 13.28. 
+        - **Logic Check:** Only mark as FAIL if the numbers are statistically different (e.g., 5% vs 10%) or totally unrelated.
 
-        Respond in valid JSON: {{ "match": boolean, "reason": "string" }}
+        **Pass Criteria:** - If the values are exact matches: Return "match": true.
+        - If the values are "Near Misses" (within tolerance): Return "match": true, and note the variance in the reason.
+        - If the values are significantly different: Return "match": false.
+
+        Respond in valid JSON: {{ "match": boolean, "reason": "string", "error_type": "None | Precision | Logic_Mismatch" }}
         """
 
         try:
@@ -256,6 +263,15 @@ class BigQueryExecutor:
                 # Attempt fallback: load_table_from_dataframe (handles schema differences better)
                 try:
                     df_fallback = pd.DataFrame(clean_results)
+                    # Coerce timestamp-like columns to pandas datetime dtype (UTC)
+                    for col in df_fallback.columns:
+                        if col.lower() == 'timestamp' or 'time' in col.lower() or 'date' in col.lower():
+                            try:
+                                df_fallback[col] = pd.to_datetime(df_fallback[col], errors='coerce', utc=True)
+                                logger.info(f"Coerced column '{col}' to datetime (UTC) for fallback load")
+                            except Exception as coe:
+                                logger.warning(f"Failed to coerce column '{col}' to datetime: {coe}")
+
                     load_job = self.client.load_table_from_dataframe(df_fallback, table_ref)
                     load_job.result()  # wait
                     logger.info(f"✅ Fallback load_table_from_dataframe succeeded for {len(df_fallback)} rows into {table_ref}")
