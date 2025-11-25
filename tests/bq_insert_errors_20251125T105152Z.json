@@ -1,0 +1,384 @@
+{
+  "errors": [
+    {
+      "index": 0,
+      "errors": [
+        {
+          "reason": "invalid",
+          "location": "latency",
+          "debugInfo": "",
+          "message": "no such field: latency."
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "errors": [
+        {
+          "reason": "invalid",
+          "location": "latency",
+          "debugInfo": "",
+          "message": "no such field: latency."
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "errors": [
+        {
+          "reason": "invalid",
+          "location": "latency",
+          "debugInfo": "",
+          "message": "no such field: latency."
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "errors": [
+        {
+          "reason": "invalid",
+          "location": "domain_match",
+          "debugInfo": "",
+          "message": "Cannot convert string value to boolean: 1"
+        }
+      ]
+    },
+    {
+      "index": 4,
+      "errors": [
+        {
+          "reason": "invalid",
+          "location": "latency",
+          "debugInfo": "",
+          "message": "no such field: latency."
+        }
+      ]
+    },
+    {
+      "index": 5,
+      "errors": [
+        {
+          "reason": "invalid",
+          "location": "latency",
+          "debugInfo": "",
+          "message": "no such field: latency."
+        }
+      ]
+    },
+    {
+      "index": 6,
+      "errors": [
+        {
+          "reason": "invalid",
+          "location": "latency",
+          "debugInfo": "",
+          "message": "no such field: latency."
+        }
+      ]
+    },
+    {
+      "index": 7,
+      "errors": [
+        {
+          "reason": "invalid",
+          "location": "latency",
+          "debugInfo": "",
+          "message": "no such field: latency."
+        }
+      ]
+    },
+    {
+      "index": 8,
+      "errors": [
+        {
+          "reason": "invalid",
+          "location": "domain_match",
+          "debugInfo": "",
+          "message": "Cannot convert string value to boolean: 1"
+        }
+      ]
+    },
+    {
+      "index": 9,
+      "errors": [
+        {
+          "reason": "invalid",
+          "location": "domain_match",
+          "debugInfo": "",
+          "message": "Cannot convert string value to boolean: 1"
+        }
+      ]
+    },
+    {
+      "index": 10,
+      "errors": [
+        {
+          "reason": "invalid",
+          "location": "latency",
+          "debugInfo": "",
+          "message": "no such field: latency."
+        }
+      ]
+    },
+    {
+      "index": 11,
+      "errors": [
+        {
+          "reason": "invalid",
+          "location": "domain_match",
+          "debugInfo": "",
+          "message": "Cannot convert string value to boolean: 1"
+        }
+      ]
+    },
+    {
+      "index": 12,
+      "errors": [
+        {
+          "reason": "invalid",
+          "location": "domain_match",
+          "debugInfo": "",
+          "message": "Cannot convert string value to boolean: 1"
+        }
+      ]
+    },
+    {
+      "index": 13,
+      "errors": [
+        {
+          "reason": "invalid",
+          "location": "domain_match",
+          "debugInfo": "",
+          "message": "Cannot convert string value to boolean: 1"
+        }
+      ]
+    }
+  ],
+  "rows": [
+    {
+      "run_id": "681818",
+      "timestamp": "2025-11-25T10:47:46.378384+00:00",
+      "question_id": 1,
+      "run_number": 1,
+      "question": "What is GNS4 trend for last 4 months?",
+      "expected_domain": "Collections",
+      "actual_domain": "COLLECTIONS",
+      "domain_match": 1,
+      "status": "PASS",
+      "reason": "LLM Judge: The data is a match. All corresponding values are either identical or within the acceptable rounding tolerance. The value for 2025-10-01 is 13.27 in the bot's data vs 13.28 in the reference, which is an acceptable near miss.",
+      "latency_seconds": 1.39,
+      "latency": 1.39,
+      "generated_sql": "WITH MaxDate AS (\n  SELECT\n    MAX(BUSINESS_DATE) AS max_dt\n  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`\n)\nSELECT\n  DATE_TRUNC(t.BUSINESS_DATE, MONTH) AS month,\n  ROUND(\n    SAFE_DIVIDE(\n      COUNT(DISTINCT CASE WHEN t.Bounce_Flag = 'Y' THEN t.AGREEMENTNO END),\n      COUNT(DISTINCT t.AGREEMENTNO)\n    ) * 100,\n    2\n  ) AS gns4_percentage\nFROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t\nCROSS JOIN MaxDate\nWHERE\n  t.BUSINESS_DATE >= DATE_SUB(MaxDate.max_dt, INTERVAL '4' MONTH)\n  AND t.MOB_ON_INSTL_START_DATE = 4\n  AND t.SOM_NPASTAGEID = 'REGULAR'\nGROUP BY\n  1\nORDER BY\n  1 DESC",
+      "error_message": null
+    },
+    {
+      "run_id": "681818",
+      "timestamp": "2025-11-25T10:48:09.251786+00:00",
+      "question_id": 2,
+      "run_number": 1,
+      "question": "Give me top 10 dealer names that have the highest NNS3 percentage and cases are more than 30 per dealer? Show the number of cases.",
+      "expected_domain": "Collections",
+      "actual_domain": "COLLECTIONS",
+      "domain_match": 1,
+      "status": "FAIL",
+      "reason": "LLM Judge: The bot failed to provide the 'dealer_name' as explicitly requested by the user, returning 'supplierid' instead. This is a critical failure to meet the user's requirement. Furthermore, the data is incorrect as the top result from the reference data ('SAI MOTORS' with 36 cases and 5.56% NNS3) is completely missing from the bot's output.",
+      "latency_seconds": 1.68,
+      "latency": 1.68,
+      "generated_sql": "WITH MaxDate AS (\n  SELECT\n    MAX(BUSINESS_DATE) AS dt\n  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`\n)\nSELECT\n  t.SUPPLIERID,\n  COUNT(DISTINCT t.AGREEMENTNO) AS total_nns3_cases,\n  ROUND(\n    SAFE_DIVIDE(\n      COUNT(DISTINCT CASE WHEN t.NNS3 = 'Y' THEN t.AGREEMENTNO END),\n      COUNT(DISTINCT t.AGREEMENTNO)\n    ) * 100,\n    2\n  ) AS nns3_percentage\nFROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t\nJOIN MaxDate AS md\n  ON t.BUSINESS_DATE = md.dt\nWHERE\n  t.MOB_ON_INSTL_START_DATE = 3 AND t.SOM_NPASTAGEID = 'REGULAR' AND t.SOM_POS > 0\nGROUP BY\n  t.SUPPLIERID\nHAVING\n  COUNT(DISTINCT t.AGREEMENTNO) > 30\nORDER BY\n  nns3_percentage DESC\nLIMIT 10",
+      "error_message": null
+    },
+    {
+      "run_id": "681818",
+      "timestamp": "2025-11-25T10:48:37.156863+00:00",
+      "question_id": 3,
+      "run_number": 1,
+      "question": "Show me the top 10 dealers where banking model has highest no hit percentage? application count should be greater than 30 and what is the approval percentage?",
+      "expected_domain": "Sourcing",
+      "actual_domain": "SOURCING",
+      "domain_match": 1,
+      "status": "FAIL",
+      "reason": "LLM Judge: The bot's response contains a significantly different list of dealers compared to the reference data. Only 3 out of the 10 dealers are present in both lists ('MAHAVEER MOTORS 33091', 'SAYAN MOTORS HONDA', 'POLAS MOTORS'), and for these dealers, the reported metrics such as 'total_applications' and percentages are substantially different, falling well outside the acceptable variance. For instance, the reference data's top dealer, 'Chandra Automobiles' (96.97% no-hit rate), is completely absent from the bot's response, which instead lists 'VARSHA AUTOLINES' (95.65% no-hit rate) as its top result. This indicates a fundamental discrepancy in the data retrieval or filtering logic.",
+      "latency_seconds": 1.92,
+      "latency": 1.92,
+      "generated_sql": "SELECT\n  Dealer_Name_Supplier__c,\n  COUNT(*) AS total_applications,\n  COUNT(\n    CASE\n      WHEN NOT (\n        FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%'\n        OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%'\n      )\n      THEN 1\n    END\n  ) AS no_banking_hits_count,\n  ROUND(\n    SAFE_DIVIDE(\n      COUNT(\n        CASE\n          WHEN NOT (\n            FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%'\n            OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%'\n          )\n          THEN 1\n        END\n      ),\n      COUNT(*)\n    ) * 100,\n    2\n  ) AS no_banking_hit_percentage_pct,\n  ROUND(\n    SAFE_DIVIDE(\n      COUNT(CASE WHEN BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction') THEN 1 END),\n      COUNT(*)\n    ) * 100,\n    2\n  ) AS approval_percentage_pct\nFROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`\nWHERE\n  DATE(LastModifiedDate) >= DATE_SUB(DATE_TRUNC(DATE_SUB(CURRENT_DATE, INTERVAL '1' MONTH), MONTH), INTERVAL '3' MONTH)\n  AND DATE(LastModifiedDate) <= LAST_DAY(DATE_SUB(CURRENT_DATE, INTERVAL '1' MONTH))\nGROUP BY\n  Dealer_Name_Supplier__c\nHAVING\n  COUNT(*) > 30\nORDER BY\n  no_banking_hit_percentage_pct DESC\nLIMIT 10",
+      "error_message": null
+    },
+    {
+      "run_id": "681818",
+      "timestamp": "2025-11-25T10:48:55.042542+00:00",
+      "question_id": 4,
+      "run_number": 1,
+      "question": "SHow me the bounce rate on 0 dpd for Assam?",
+      "expected_domain": "Collections",
+      "actual_domain": "COLLECTIONS",
+      "domain_match": 1,
+      "status": "PASS",
+      "reason": "LLM Judge: All values for Assam, including total accounts, bounced accounts, and bounce rate, are exact matches.",
+      "latency_seconds": 1.17,
+      "latency": 1.17,
+      "generated_sql": "WITH MaxDate AS (\n  SELECT\n    MAX(BUSINESS_DATE) AS dt\n  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`\n)\nSELECT\n  UPPER(STATE) AS state,\n  COUNT(DISTINCT CASE WHEN T2.Bounce_Flag = 'Y' THEN T2.AGREEMENTNO END) AS bounced_accounts_0_dpd,\n  COUNT(DISTINCT T2.AGREEMENTNO) AS total_accounts_0_dpd,\n  ROUND(\n    SAFE_DIVIDE(\n      COUNT(DISTINCT CASE WHEN T2.Bounce_Flag = 'Y' THEN T2.AGREEMENTNO END),\n      COUNT(DISTINCT T2.AGREEMENTNO)\n    ) * 100,\n    2\n  ) AS bounce_rate_0_dpd_percentage\nFROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS T2\nJOIN MaxDate AS MD\n  ON T2.BUSINESS_DATE = MD.dt\nWHERE\n  T2.SOM_DPD = 0\n  AND UPPER(T2.STATE) = 'ASSAM'\n  AND T2.SOM_NPASTAGEID = 'REGULAR'\n  AND T2.SOM_POS > 0\nGROUP BY\n  state\nORDER BY\n  bounce_rate_0_dpd_percentage DESC\nLIMIT 10",
+      "error_message": null
+    },
+    {
+      "run_id": "681818",
+      "timestamp": "2025-11-25T10:49:05.953243+00:00",
+      "question_id": 5,
+      "run_number": 1,
+      "question": "What is the rejection based on CIBIL score below 650 in the last 3 months? Month on month?",
+      "expected_domain": "Sourcing",
+      "actual_domain": "SOURCING",
+      "domain_match": 1,
+      "status": "PASS",
+      "reason": "Numeric Exact Match",
+      "latency_seconds": 1.44,
+      "latency": 1.44,
+      "generated_sql": "SELECT\n  FORMAT_DATE('%Y-%m', DATE_TRUNC(DATE(LastModifiedDate), MONTH)) AS month,\n  COUNT(*) AS total_applications,\n  COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END) AS rejected_applications,\n  ROUND(\n    SAFE_DIVIDE(\n      COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END),\n      COUNT(*)\n    ) * 100,\n    2\n  ) AS rejection_rate_pct\nFROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`\nWHERE\n  DATE(LastModifiedDate) >= DATE_SUB(DATE_TRUNC(DATE_SUB(CURRENT_DATE, INTERVAL '1' MONTH), MONTH), INTERVAL '2' MONTH)\n  AND DATE(LastModifiedDate) <= LAST_DAY(DATE_SUB(CURRENT_DATE, INTERVAL '1' MONTH))\n  AND SAFE_CAST(CIBIL_SCORE AS INT64) < 650\nGROUP BY\n  1\nORDER BY\n  1",
+      "error_message": null
+    },
+    {
+      "run_id": "681818",
+      "timestamp": "2025-11-25T10:49:40.648274+00:00",
+      "question_id": 6,
+      "run_number": 1,
+      "question": "What is the rejection rate for applications where CIBIL score is between 300-650 in October 2025? Also list out the reason of rejections for these cases.",
+      "expected_domain": "Sourcing",
+      "actual_domain": "SOURCING",
+      "domain_match": 1,
+      "status": "PASS",
+      "reason": "LLM Judge: The bot's response accurately provides the overall rejection rate (95.42%), total applications (5518), and rejected applications (5265). It also correctly lists all rejection reasons and their corresponding counts. The difference in table structure and column headers is acceptable per the evaluation rules.",
+      "latency_seconds": 1.19,
+      "latency": 1.19,
+      "generated_sql": "WITH FilteredApplications AS (\n  SELECT\n    BRE_Sanction_Result__c,\n    SCORECARD_MODEL_DESCRIPTION_BRE__c\n  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`\n  WHERE\n    DATE(LastModifiedDate) >= '2025-10-01'\n    AND DATE(LastModifiedDate) < '2025-11-01'\n    AND SAFE_CAST(CIBIL_SCORE AS INT64) BETWEEN 300 AND 650\n)\nSELECT\n  'Overall Rejection Summary' AS category,\n  NULL AS rejection_reason_description,\n  ROUND(\n    SAFE_DIVIDE(\n      COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END),\n      COUNT(*)\n    ) * 100,\n    2\n  ) AS rejection_rate_pct,\n  COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END) AS rejected_applications_count,\n  COUNT(*) AS total_applications_in_segment\nFROM FilteredApplications\nUNION ALL\nSELECT\n  'Rejection Reason Breakdown' AS category,\n  COALESCE(SCORECARD_MODEL_DESCRIPTION_BRE__c, 'Unknown/Missing Reason') AS rejection_reason_description,\n  NULL AS rejection_rate_pct, /* This rate applies to the overall segment, not per reason */\n  COUNT(*) AS rejected_applications_count,\n  NULL AS total_applications_in_segment\nFROM FilteredApplications\nWHERE\n  BRE_Sanction_Result__c IN ('REJECT', 'Reject')\nGROUP BY\n  COALESCE(SCORECARD_MODEL_DESCRIPTION_BRE__c, 'Unknown/Missing Reason')\nORDER BY\n  category DESC,\n  rejected_applications_count DESC",
+      "error_message": null
+    },
+    {
+      "run_id": "681818",
+      "timestamp": "2025-11-25T10:49:59.586683+00:00",
+      "question_id": 7,
+      "run_number": 1,
+      "question": "what is the current 1-30 delinquency percentage of the portfolio in comparison with last year?",
+      "expected_domain": "Collections",
+      "actual_domain": "COLLECTIONS",
+      "domain_match": 1,
+      "status": "FAIL",
+      "reason": "LLM Judge: The bot's reported current 1-30 delinquency percentage (4.6%) and last year's percentage (5.34%) are significantly different from the reference values (3.91% and 3.3%, respectively). The differences are well outside the acceptable numerical tolerance.",
+      "latency_seconds": 1.1,
+      "latency": 1.1,
+      "generated_sql": "WITH MaxDate AS (\n  SELECT\n    MAX(BUSINESS_DATE) AS max_dt\n  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`\n), CurrentMonthData AS (\n  SELECT\n    COUNT(DISTINCT AGREEMENTNO) AS total_accounts_current,\n    COUNT(DISTINCT CASE WHEN DPD_BUCKET = 1 THEN AGREEMENTNO END) AS dpd_1_30_accounts_current\n  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`\n  WHERE\n    BUSINESS_DATE = (\n      SELECT\n        max_dt\n      FROM MaxDate\n    )\n    AND SOM_NPASTAGEID = 'REGULAR'\n    AND SOM_POS > 0\n), LastYearMonthData AS (\n  SELECT\n    COUNT(DISTINCT AGREEMENTNO) AS total_accounts_last_year,\n    COUNT(DISTINCT CASE WHEN DPD_BUCKET = 1 THEN AGREEMENTNO END) AS dpd_1_30_accounts_last_year\n  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`\n  WHERE\n    BUSINESS_DATE = DATE_SUB((\n      SELECT\n        max_dt\n      FROM MaxDate\n    ), INTERVAL '1' YEAR)\n    AND SOM_NPASTAGEID = 'REGULAR'\n    AND SOM_POS > 0\n)\nSELECT\n  ROUND(SAFE_DIVIDE(cmd.dpd_1_30_accounts_current, cmd.total_accounts_current) * 100, 2) AS current_1_30_dpd_percentage,\n  ROUND(\n    SAFE_DIVIDE(lymd.dpd_1_30_accounts_last_year, lymd.total_accounts_last_year) * 100,\n    2\n  ) AS last_year_1_30_dpd_percentage,\n  (\n    SELECT\n      max_dt\n    FROM MaxDate\n  ) AS current_business_date,\n  DATE_SUB((\n    SELECT\n      max_dt\n    FROM MaxDate\n  ), INTERVAL '1' YEAR) AS last_year_business_date\nFROM CurrentMonthData AS cmd\nCROSS JOIN LastYearMonthData AS lymd",
+      "error_message": null
+    },
+    {
+      "run_id": "681818",
+      "timestamp": "2025-11-25T10:50:12.675890+00:00",
+      "question_id": 8,
+      "run_number": 1,
+      "question": "How many cases who were at 0 delinquency last year and now have slipped to 90+ ?",
+      "expected_domain": "Collections",
+      "actual_domain": "COLLECTIONS",
+      "domain_match": 1,
+      "status": "PASS",
+      "reason": "LLM Judge: The bot's answer (60806) is within the 1% tolerance of the reference value (60734). The relative difference is approximately 0.12%.",
+      "latency_seconds": 1.02,
+      "latency": 1.02,
+      "generated_sql": "WITH MaxDate AS (\n  SELECT\n    MAX(BUSINESS_DATE) AS max_business_date\n  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`\n)\nSELECT\n  COUNT(DISTINCT AGREEMENTNO) AS cases_slipped_0ly_to_90plus_current\nFROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`\nWHERE\n  BUSINESS_DATE = (\n    SELECT\n      max_business_date\n    FROM MaxDate\n  )\n  AND Delinquency_0LY_90PLUSCurrent_SLIPPAGE_Flag = 1",
+      "error_message": null
+    },
+    {
+      "run_id": "681818",
+      "timestamp": "2025-11-25T10:50:29.633648+00:00",
+      "question_id": 9,
+      "run_number": 1,
+      "question": "Which state has the highest normalization rate for the current month in DPD BKT 1?",
+      "expected_domain": "Collections",
+      "actual_domain": "COLLECTIONS",
+      "domain_match": 1,
+      "status": "PASS",
+      "reason": "LLM Judge: The bot's data is an exact match to the reference data. All states and their corresponding normalization rates, counts, and totals are identical.",
+      "latency_seconds": 1.03,
+      "latency": 1.03,
+      "generated_sql": "WITH MaxDate AS (\n  SELECT\n    MAX(BUSINESS_DATE) AS max_business_date\n  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`\n)\nSELECT\n  t.STATE,\n  COUNT(DISTINCT t.AGREEMENTNO) AS total_accounts_in_som_dpd_bucket_1,\n  COUNT(DISTINCT CASE WHEN t.DPD_BUCKET = 0 THEN t.AGREEMENTNO END) AS normalized_accounts_count,\n  ROUND(\n    SAFE_DIVIDE(\n      COUNT(DISTINCT CASE WHEN t.DPD_BUCKET = 0 THEN t.AGREEMENTNO END),\n      COUNT(DISTINCT t.AGREEMENTNO)\n    ) * 100,\n    2\n  ) AS normalization_rate_percentage\nFROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t\nWHERE\n  t.BUSINESS_DATE = (\n    SELECT\n      max_business_date\n    FROM MaxDate\n  )\n  AND t.SOM_DPD_BUCKET = 1\n  AND t.SOM_NPASTAGEID = 'REGULAR'\n  AND t.SOM_POS > 0\nGROUP BY\n  t.STATE\nORDER BY\n  normalization_rate_percentage DESC\nLIMIT 5",
+      "error_message": null
+    },
+    {
+      "run_id": "681818",
+      "timestamp": "2025-11-25T10:50:39.218471+00:00",
+      "question_id": 10,
+      "run_number": 1,
+      "question": "Which state has the highest roll forward rate for the current month in DPD BKT 2?",
+      "expected_domain": "Collections",
+      "actual_domain": "COLLECTIONS",
+      "domain_match": 1,
+      "status": "PASS",
+      "reason": "Numeric Exact Match",
+      "latency_seconds": 1.05,
+      "latency": 1.05,
+      "generated_sql": "WITH MaxDate AS (\n  SELECT\n    MAX(BUSINESS_DATE) AS max_business_date\n  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`\n)\nSELECT\n  t.STATE,\n  COUNT(\n    DISTINCT CASE WHEN (\n      t.DPD_BUCKET - t.SOM_DPD_BUCKET\n    ) > 0 THEN t.AGREEMENTNO END\n  ) AS roll_forward_count,\n  COUNT(DISTINCT t.AGREEMENTNO) AS total_bucket_2_accounts,\n  ROUND(\n    SAFE_DIVIDE(\n      COUNT(\n        DISTINCT CASE WHEN (\n          t.DPD_BUCKET - t.SOM_DPD_BUCKET\n        ) > 0 THEN t.AGREEMENTNO END\n      ),\n      COUNT(DISTINCT t.AGREEMENTNO)\n    ) * 100,\n    2\n  ) AS roll_forward_rate_percentage\nFROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t\nWHERE\n  t.BUSINESS_DATE = (\n    SELECT\n      max_business_date\n    FROM MaxDate\n  )\n  AND t.SOM_DPD_BUCKET = 2\n  AND t.SOM_NPASTAGEID = 'REGULAR'\nGROUP BY\n  t.STATE\nORDER BY\n  roll_forward_rate_percentage DESC\nLIMIT 5",
+      "error_message": null
+    },
+    {
+      "run_id": "681818",
+      "timestamp": "2025-11-25T10:50:55.889102+00:00",
+      "question_id": 11,
+      "run_number": 1,
+      "question": "What is the current 90+ DPD percentage for the entire portfolio?",
+      "expected_domain": "Collections",
+      "actual_domain": "COLLECTIONS",
+      "domain_match": 1,
+      "status": "PASS",
+      "reason": "LLM Judge: The bot's reported 90+ DPD percentage of 7.16 is an exact match to the reference data.",
+      "latency_seconds": 0.94,
+      "latency": 0.94,
+      "generated_sql": "WITH MaxDate AS (\n  SELECT\n    MAX(BUSINESS_DATE) AS dt\n  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`\n)\nSELECT\n  ROUND(SAFE_DIVIDE(SUM(t.NR_90_PLUS), SUM(t.POS)) * 100, 2) AS current_90_plus_dpd_percentage\nFROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t\nCROSS JOIN MaxDate AS m\nWHERE\n  t.BUSINESS_DATE = m.dt\n  AND t.POS > 0 /* Filter for active accounts with outstanding principal */",
+      "error_message": null
+    },
+    {
+      "run_id": "681818",
+      "timestamp": "2025-11-25T10:51:10.400575+00:00",
+      "question_id": 12,
+      "run_number": 1,
+      "question": "Show me the Vintage Curve for 30+ Delinquency for loans disbursed in Jan 2024, Feb 2024, and Mar 2024? At MOB = 3, 6, 9, 12.",
+      "expected_domain": "Collections",
+      "actual_domain": "COLLECTIONS",
+      "domain_match": 1,
+      "status": "PASS",
+      "reason": "Numeric Exact Match",
+      "latency_seconds": 1.04,
+      "latency": 1.04,
+      "generated_sql": "WITH MaxDate AS (\n  SELECT\n    MAX(BUSINESS_DATE) AS dt\n  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`\n)\nSELECT\n  DATE_TRUNC(t.DISBURSALDATE, MONTH) AS disbursal_month,\n  ROUND(SAFE_DIVIDE(SUM(t.NR_30_PLUS_3MOB), SUM(t.DR_30_PLUS_3MOB)) * 100, 2) AS mob_3_delinquency_rate_30_plus, /* MOB 3 Rate */\n  ROUND(SAFE_DIVIDE(SUM(t.NR_30_PLUS_6MOB), SUM(t.DR_30_PLUS_6MOB)) * 100, 2) AS mob_6_delinquency_rate_30_plus, /* MOB 6 Rate */\n  ROUND(SAFE_DIVIDE(SUM(t.NR_30_PLUS_9MOB), SUM(t.DR_30_PLUS_9MOB)) * 100, 2) AS mob_9_delinquency_rate_30_plus, /* MOB 9 Rate (Included as per user request and example, assuming existence) */\n  ROUND(SAFE_DIVIDE(SUM(t.NR_30_PLUS_12MOB), SUM(t.DR_30_PLUS_12MOB)) * 100, 2) AS mob_12_delinquency_rate_30_plus /* MOB 12 Rate */\nFROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t\nCROSS JOIN MaxDate AS md\nWHERE\n  t.BUSINESS_DATE = md.dt AND t.DISBURSALDATE BETWEEN '2024-01-01' AND '2024-03-31'\nGROUP BY\n  1\nORDER BY\n  1",
+      "error_message": null
+    },
+    {
+      "run_id": "681818",
+      "timestamp": "2025-11-25T10:51:25.577913+00:00",
+      "question_id": 13,
+      "run_number": 1,
+      "question": "Identify customers who have 'slipped' significantly: They were 0 DPD exactly one year ago but are 90+ DPD today?",
+      "expected_domain": "Collections",
+      "actual_domain": "COLLECTIONS",
+      "domain_match": 1,
+      "status": "FAIL",
+      "reason": "LLM Judge: The user requested an aggregated count and percentage of 'slipped' customers. The bot returned a list of individual customer records instead of the requested summary statistics. The reference data provides a specific count (60,734) and percentage (2.69), which are completely absent from the bot's response.",
+      "latency_seconds": 1.01,
+      "latency": 1.01,
+      "generated_sql": "WITH MaxDate AS (\n  SELECT\n    MAX(BUSINESS_DATE) AS dt\n  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`\n)\nSELECT\n  t.AGREEMENTNO,\n  t.DISBURSALDATE,\n  t.MATURITYDATE,\n  t.STATE,\n  t.CITY,\n  t.DPD_BUCKET\nFROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t\nJOIN MaxDate AS md\n  ON t.BUSINESS_DATE = md.dt\nWHERE\n  t.Delinquency_0LY_90PLUSCurrent_SLIPPAGE_Flag = 1\nLIMIT 10",
+      "error_message": null
+    },
+    {
+      "run_id": "681818",
+      "timestamp": "2025-11-25T10:51:51.233603+00:00",
+      "question_id": 14,
+      "run_number": 1,
+      "question": "Analyze the portfolio risk by Ticket Size: Amount Finance and show the 90+ DPD POS for each?",
+      "expected_domain": "Collections",
+      "actual_domain": "COLLECTIONS",
+      "domain_match": 1,
+      "status": "FAIL",
+      "reason": "LLM Judge: The 'total_90_plus_dpd_pos' values generated by the bot are significantly different from the 'pos_90_plus' values in the reference data. For example, for the '>= 75K to < 100K' band, the bot reported 3.97B while the reference value is 2.30B, a difference of over 72%. All other categories show similar large discrepancies, indicating a fundamental calculation error.",
+      "latency_seconds": 0.98,
+      "latency": 0.98,
+      "generated_sql": "WITH MaxDate AS (\n  SELECT\n    MAX(BUSINESS_DATE) AS dt\n  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`\n)\nSELECT\n  t.AMTFIN_BAND,\n  SUM(t.NR_90_PLUS) AS total_90_plus_dpd_pos\nFROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t\nWHERE\n  t.BUSINESS_DATE = (\n    SELECT\n      dt\n    FROM MaxDate\n  )\nGROUP BY\n  t.AMTFIN_BAND\nORDER BY\n  total_90_plus_dpd_pos DESC",
+      "error_message": null
+    }
+  ]
+}
