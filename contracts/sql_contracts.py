@@ -28,7 +28,6 @@ class QueryMetadata(BaseModel):
     aggregation_level: Optional[str] = Field(None, description="Monthly/Daily/Yearly aggregation")
     time_range: Optional[Dict[str, str]] = Field(None, description="Start and end dates for the query")
 
-
 class SQLGenerationRequest(BaseModel):
     """Request contract for Domain Agents to generate SQL"""
     user_question: str = Field(..., description="Natural language question from user")

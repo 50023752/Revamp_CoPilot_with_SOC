@@ -19,6 +19,8 @@ import sqlglot
 from google.adk.agents import BaseAgent, LlmAgent
 from google.adk.events import Event
 from google.genai.types import Content, Part
+from google.genai import types
+
 
 # Imports for Context creation (Required for Option A)
 from google.adk.agents.invocation_context import InvocationContext
@@ -272,7 +274,8 @@ WHERE DATE(LastModifiedDate) >= DATE_SUB(DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INT
             name="SourcingSQLGenerator",
             model=model_name,
             instruction=self.INSTRUCTION_TEMPLATE,
-            output_key="generated_sql"
+            output_key="generated_sql",
+            generate_content_config=types.GenerateContentConfig(temperature=0.0)
         )
 
         super().__init__(

@@ -18,6 +18,8 @@ import sqlglot
 from google.adk.agents import BaseAgent, LlmAgent
 from google.adk.events import Event
 from google.genai.types import Content, Part
+from google.genai import types
+
 
 # Imports for Context creation (Required for Option A)
 from google.adk.agents.invocation_context import InvocationContext
@@ -70,13 +72,18 @@ A. Portfolio Segmentation (The "Regular" vs "Risk" Switch)
     Trigger: Questions asking for "90+ DPD", "NPA", "Risk", "Slippage to 90+", "Write-offs", or "Portfolio Quality".
     SQL Filter: DO NOT apply SOM_NPASTAGEID = 'REGULAR'. You must capture the bad debt.
 
-B.  Ensure you still filter for active accounts if implied: AND SOM_POS > 0.
+B.  Ensure you still filter for active accounts : AND SOM_POS > 0.
+    NEVER use `WHERE POS > 0`. This is strictly forbidden.
+   - Reason: `POS > 0` excludes accounts that closed *during* the month, which corrupts the snapshot denominator.
 2.  **Active/Regular Accounts**: 
     - SQL: `WHERE SOM_NPASTAGEID = 'REGULAR' AND SOM_POS > 0`
 3.  **Zero DPD**: 
-    - SQL: `WHERE SOM_DPD = 0`
+    - SQL: `WHERE SOM_DPD = 0` and AND SOM_POS > 0`
 4.  **XBKT (Regular accounts that just bounced)**: 
     - SQL: `WHERE Bounce_Flag = 'Y' AND SOM_DPD = 0`
+    5. ### 🚫 Anti-Patterns & Negative Constraints
+    - **No Chatty Responses:** Return only SQL. Never provide explanations.
+    - **Vintage Analysis Rule:** NEVER filter by `Business_Date` for Vintage/Static Pool analysis. Vintage analysis measures portfolio quality over time, so you MUST filter based on `DISBURSALDATE` (e.g., `WHERE DISBURSALDATE BETWEEN ...`) to capture the cohort correctly.
 
 #### B. NNS & GNS Calculation Rules (CRITICAL)
 You **MUST** apply the corresponding `MOB` filter when querying NNS/GNS columns.
@@ -95,9 +102,6 @@ You **MUST** apply the corresponding `MOB` filter when querying NNS/GNS columns.
   - NEVER use `CURRENT_DATE()`. Always anchor to the max date in data.
   - "Last 3 Months": `WHERE BUSINESS_DATE >= DATE_SUB((SELECT MAX(BUSINESS_DATE) FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.collections_table}`), INTERVAL 3 MONTH)`
   - "Last 6 Months": `WHERE BUSINESS_DATE >= DATE_SUB((SELECT MAX(BUSINESS_DATE) FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.collections_table}`), INTERVAL 6 MONTH)`
-  - **"Current" Status**: NEVER use `SOM_` columns (e.g., `SOM_DPD`) for current status. 
-  - Use `DPD_BUCKET` (for buckets) or `NR_` columns (for amounts).
-  - Use `POS` (Current Balance), not `SOM_POS`.
 - **"Current" Status**: NEVER use SOM_ columns (e.g., SOM_DPD) for current status.
                         Use DPD_BUCKET (for buckets) or NR_ columns (for amounts).
                         Use POS (Current Balance), not SOM_POS.
@@ -153,7 +157,7 @@ Available MOBs: 3, 6, 9, 12.
 
 **User**: "What is the GNS1 % for the last 3 months?"
 **Thought**: 
-1. **Metric**: GNS1 Rate. Numerator = Count(GNS1='Y' & Bounce='Y'). Denominator = Count(All Accounts).
+1. **Metric**: GNS1 Rate. Numerator = Count(Bounce='Y'). Denominator = Count(All Accounts).
 2. **Filters**: `MOB_ON_INSTL_START_DATE = 1` (Mandatory for GNS1). `SOM_NPASTAGEID = 'REGULAR'` (Standard exclusion).
 3. **Time**: Last 3 months relative to MAX date.
 **SQL**:
@@ -174,26 +178,26 @@ ORDER BY 1 DESC
 
 **User**: "What is the 0+ dpd count and percentage for last 6 months?"
 **Thought**: 
-1. **Metric**: 0+ DPD means `SOM_DPD > 0`.
+1. **Metric**: 0+ DPD means `DPD > 0`.
 2. **Time**: Last 6 months relative to MAX date.
-3. **Exclusions**: Keep standard `SOM_NPASTAGEID = 'REGULAR'`.
+3. **Exclusions**: Keep standard `SOM_NPASTAGEID = 'REGULAR'` and `SOM_POS > 0`.
 **SQL**:
 ```sql
 SELECT
   DATE_TRUNC(BUSINESS_DATE, MONTH) AS month,
   COUNT(DISTINCT AGREEMENTNO) AS total_accounts,
-  COUNT(DISTINCT CASE WHEN SOM_DPD > 0 THEN AGREEMENTNO END) AS col_0_plus_dpd_accounts,
-  ROUND(SAFE_DIVIDE(COUNT(DISTINCT CASE WHEN SOM_DPD > 0 THEN AGREEMENTNO END), COUNT(DISTINCT AGREEMENTNO)) * 100, 2) AS col_0_plus_dpd_percentage
+  COUNT(DISTINCT CASE WHEN DPD > 0 THEN AGREEMENTNO END) AS col_0_plus_dpd_accounts,
+  ROUND(SAFE_DIVIDE(COUNT(DISTINCT CASE WHEN DPD > 0 THEN AGREEMENTNO END), COUNT(DISTINCT AGREEMENTNO)) * 100, 2) AS col_0_plus_dpd_percentage
 FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.collections_table}`
 WHERE BUSINESS_DATE >= DATE_SUB((SELECT MAX(BUSINESS_DATE) FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.collections_table}`), INTERVAL 6 MONTH)
-  AND SOM_NPASTAGEID = 'REGULAR'
+  AND SOM_NPASTAGEID = 'REGULAR' and SOM_POS > 0
 GROUP BY month
 ORDER BY month DESC
 ```
 
 **User**: "Which state had the highest roll forward rate in DPD Bucket 1 last month?"
 **Thought**: 
-1. **Population**: `SOM_DPD_BUCKET = 1`.
+1. **Population**: `SOM_DPD_BUCKET = 1` and SOM_POS > 0.
 2. **Logic**: Roll Forward means `DPD_BUCKET > SOM_DPD_BUCKET` (moved to 2, 3, etc).
 3. **Time**: `BUSINESS_DATE = Max Date`.
 **SQL**:
@@ -209,7 +213,7 @@ SELECT
 FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.collections_table}`
 WHERE BUSINESS_DATE = (SELECT MAX(BUSINESS_DATE) FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.collections_table}`)
   AND SOM_DPD_BUCKET = 1
-  AND SOM_NPASTAGEID = 'REGULAR'
+  AND SOM_NPASTAGEID = 'REGULAR' AND SOM_POS > 0
 GROUP BY STATE
 ORDER BY roll_forward_rate DESC
 LIMIT 5
@@ -217,7 +221,7 @@ LIMIT 5
 
 **User**: "Which state has the highest normalization rate for the current month in DPD BKT 1?"
 **Thought**: 
-1. **Population**: `SOM_DPD_BUCKET = 1`.
+1. **Population**: `SOM_DPD_BUCKET = 1` and SOM_POS > 0.
 2. **Logic**: Normalization means `DPD_BUCKET = 0` (moved to 0).
 3. **Time**: `BUSINESS_DATE = Max Date`.
 **SQL**:
@@ -232,7 +236,7 @@ SELECT
   ) * 100, 2) as normalization_rate
 FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.collections_table}`
 WHERE BUSINESS_DATE = (SELECT MAX(BUSINESS_DATE) FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.collections_table}`)
-  AND SOM_DPD_BUCKET = 1
+  AND SOM_DPD_BUCKET = 1 AND SOM_POS > 0
   AND SOM_NPASTAGEID = 'REGULAR'
 GROUP BY STATE
 ORDER BY normalization_rate DESC
@@ -244,7 +248,7 @@ LIMIT 5
 1. **Population**: Loans disbursed between '2024-01-01' and '2024-03-31'.
 2. **Logic**: Analysis Type: Vintage Analysis. MUST group by Disbursal Month.
 3. **Formula**: Use Pre-calculated Denominator (DR_) and Numerator (NR_) columns.
-4. **Filters**: Disbursal Date range. BUSINESS_DATE = Max Date (Latest Snapshot containing the history).
+4. **Filters**: Disbursal Date range. DO NOT TAKE BUSINESS_DATE as a filter. 
 
 **SQL**:
 ```sql
@@ -265,7 +269,7 @@ ORDER BY 1;
 ```
 User: "How is the portfolio performing at MOB 3 for 30+ delinquency?" Thought:
 Intent: Direct MOB Performance inquiry.
-Mapping Check: The user asked for "MOB 3" and "30+ DPD".
+Mapping Check: The user asked for "MOB = 3" and "30+ DPD".
 Variable Selection: I must use the pre-calculated pair NR_30_PLUS_3MOB and DR_30_PLUS_3MOB.
 Formula: Rate = Sum(Numerator) / Sum(Denominator). SQL:
 
@@ -280,7 +284,6 @@ FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.collection
 WHERE WHERE BUSINESS_DATE = (SELECT MAX(BUSINESS_DATE) FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.collections_table}`)
 GROUP BY 1
 ORDER BY 1
-
 """
     
     def __init__(self):
@@ -294,7 +297,8 @@ ORDER BY 1
             name="CollectionsSQLGenerator",
             model=model_name,
             instruction=self.INSTRUCTION_TEMPLATE,
-            output_key="generated_sql"
+            output_key="generated_sql",
+            generate_content_config=types.GenerateContentConfig(temperature=0.0)
         )
 
         super().__init__(

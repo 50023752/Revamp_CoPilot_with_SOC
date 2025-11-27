@@ -1,0 +1,1079 @@
+run_id,timestamp,question_id,run_number,question,expected_domain,actual_domain,status,reason,latency_seconds,input_tokens,output_tokens,generated_sql,error_message
+3971b6,2025-11-25 20:04:13.164364+00:00,1,1,What is GNS4 trend for last 4 months?,Collections,DomainType.COLLECTIONS,PASS,"LLM: The candidate data contains the same rows and values as the ground truth, with a minor, acceptable floating-point difference in one value (13.28 vs 13.27). The difference in row order is acceptable as the user's question about a 'trend' does not mandate a specific sort order.",0.85,0,0,"WITH MaxBusinessDate AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_dt
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  DATE_TRUNC(t1.BUSINESS_DATE, MONTH) AS month,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN t1.Bounce_Flag = 'Y' THEN t1.AGREEMENTNO END),
+      COUNT(DISTINCT t1.AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS gns4_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t1
+CROSS JOIN MaxBusinessDate AS m
+WHERE
+  t1.BUSINESS_DATE >= DATE_SUB(m.max_dt, INTERVAL '4' MONTH)
+  AND t1.MOB_ON_INSTL_START_DATE = 4
+  AND t1.SOM_NPASTAGEID = 'REGULAR'
+  AND t1.SOM_POS > 0
+GROUP BY
+  1
+ORDER BY
+  1 DESC",
+3971b6,2025-11-25 20:04:34.340606+00:00,1,2,What is GNS4 trend for last 4 months?,Collections,DomainType.COLLECTIONS,PASS,"LLM: The candidate data contains all the correct data points. The row order is different, but this is acceptable as no specific ranking was requested. A minor floating-point difference (13.28 vs 13.27) is within the allowed tolerance.",0.89,0,0,"WITH MaxDate AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_dt
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  DATE_TRUNC(t1.BUSINESS_DATE, MONTH) AS month,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN t1.Bounce_Flag = 'Y' THEN t1.AGREEMENTNO END),
+      COUNT(DISTINCT t1.AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS gns4_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t1
+CROSS JOIN MaxDate
+WHERE
+  t1.BUSINESS_DATE >= DATE_SUB(MaxDate.max_dt, INTERVAL '4' MONTH)
+  AND t1.MOB_ON_INSTL_START_DATE = 4
+  AND t1.SOM_NPASTAGEID = 'REGULAR'
+  AND t1.SOM_POS > 0
+GROUP BY
+  month
+ORDER BY
+  month DESC",
+3971b6,2025-11-25 20:04:54.589985+00:00,1,3,What is GNS4 trend for last 4 months?,Collections,DomainType.COLLECTIONS,PASS,"LLM: The candidate data contains the same rows and values as the ground truth, with a minor and acceptable floating-point difference for one value (13.28 vs 13.27). The difference in row order is acceptable as the query for a 'trend' does not mandate a specific sort order.",0.93,0,0,"WITH MaxDate AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_business_date
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  DATE_TRUNC(t.BUSINESS_DATE, MONTH) AS month,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN t.Bounce_Flag = 'Y' THEN t.AGREEMENTNO END),
+      COUNT(DISTINCT t.AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS gns4_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t
+CROSS JOIN MaxDate AS md
+WHERE
+  t.BUSINESS_DATE >= DATE_SUB(md.max_business_date, INTERVAL '4' MONTH)
+  AND t.MOB_ON_INSTL_START_DATE = 4
+  AND t.SOM_NPASTAGEID = 'REGULAR'
+  AND t.SOM_POS > 0
+GROUP BY
+  1
+ORDER BY
+  1 DESC",
+3971b6,2025-11-25 20:05:16.778184+00:00,2,1,Give me top 10 dealer names that have the highest NNS3 percentage and cases are more than 30 per dealer? Show the number of cases.,Collections,DomainType.COLLECTIONS,FAIL,"LLM: The candidate data failed to provide the 'dealer_name' as explicitly requested by the user, returning 'supplierid' instead. Furthermore, the top result from the ground truth ('SAI MOTORS' with 5.56% NNS3) is completely missing from the candidate's output, leading to a mismatch in both the rows and the corresponding data values.",0.83,0,0,"WITH MaxDate AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_business_date
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  t.SUPPLIERID,
+  COUNT(DISTINCT t.AGREEMENTNO) AS total_nns3_eligible_cases,
+  COUNT(DISTINCT CASE WHEN t.NNS3 = 'Y' THEN t.AGREEMENTNO END) AS nns3_cases,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN t.NNS3 = 'Y' THEN t.AGREEMENTNO END),
+      COUNT(DISTINCT t.AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS nns3_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t
+JOIN MaxDate AS md
+  ON t.BUSINESS_DATE = md.max_business_date
+WHERE
+  t.MOB_ON_INSTL_START_DATE = 3 AND t.SOM_NPASTAGEID = 'REGULAR' AND t.SOM_POS > 0
+GROUP BY
+  t.SUPPLIERID
+HAVING
+  COUNT(DISTINCT t.AGREEMENTNO) > 30
+ORDER BY
+  nns3_percentage DESC
+LIMIT 10",
+3971b6,2025-11-25 20:05:35.131198+00:00,2,2,Give me top 10 dealer names that have the highest NNS3 percentage and cases are more than 30 per dealer? Show the number of cases.,Collections,DomainType.COLLECTIONS,FAIL,"LLM: The candidate data failed to provide the requested 'dealer_name' and instead returned 'supplierid'. Additionally, the top result from the ground truth ('SAI MOTORS' with 36 cases and 5.56% NNS3) is missing from the candidate's result set, leading to a mismatch in the returned data.",0.71,0,0,"WITH MaxDate AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_business_date
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  t1.SUPPLIERID,
+  COUNT(DISTINCT t1.AGREEMENTNO) AS total_mob3_cases,
+  COUNT(DISTINCT CASE WHEN t1.NNS3 = 'Y' THEN t1.AGREEMENTNO END) AS nns3_cases,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN t1.NNS3 = 'Y' THEN t1.AGREEMENTNO END),
+      COUNT(DISTINCT t1.AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS nns3_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t1
+CROSS JOIN MaxDate
+WHERE
+  t1.BUSINESS_DATE = MaxDate.max_business_date
+  AND t1.MOB_ON_INSTL_START_DATE = 3 /* CRITICAL RULE for NNS3 */
+  AND t1.SOM_NPASTAGEID = 'REGULAR'
+  AND t1.SOM_POS > 0
+GROUP BY
+  t1.SUPPLIERID
+HAVING
+  COUNT(DISTINCT t1.AGREEMENTNO) > 30
+ORDER BY
+  nns3_percentage DESC
+LIMIT 10",
+3971b6,2025-11-25 20:05:53.175278+00:00,2,3,Give me top 10 dealer names that have the highest NNS3 percentage and cases are more than 30 per dealer? Show the number of cases.,Collections,DomainType.COLLECTIONS,FAIL,"LLM: The candidate data failed to return the requested 'dealer_name' and instead provided 'supplierid'. Furthermore, the numerical values for 'total_cases' and 'nns3_percentage' do not match the ground truth. For instance, the top result with an nns3_percentage of 5.56 is completely missing from the candidate's response.",0.67,0,0,"WITH MaxBusinessDate AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_dt
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  t.SUPPLIERID,
+  COUNT(DISTINCT t.AGREEMENTNO) AS total_cases,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN t.NNS3 = 'Y' THEN t.AGREEMENTNO END),
+      COUNT(DISTINCT t.AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS nns3_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t
+WHERE
+  t.BUSINESS_DATE = (
+    SELECT
+      max_dt
+    FROM MaxBusinessDate
+  )
+  AND t.MOB_ON_INSTL_START_DATE = 3
+  AND t.SOM_NPASTAGEID = 'REGULAR'
+  AND t.SOM_POS > 0
+GROUP BY
+  t.SUPPLIERID
+HAVING
+  COUNT(DISTINCT t.AGREEMENTNO) > 30
+ORDER BY
+  nns3_percentage DESC
+LIMIT 10",
+3971b6,2025-11-25 20:06:15.278074+00:00,3,1,Show me the top 10 dealers where banking model has highest no hit percentage? application count should be greater than 30 and what is the approval percentage?,Sourcing,DomainType.SOURCING,FAIL,"LLM: The candidate data is incorrect. It identifies a different set of top 10 dealers, and for the few dealers that do appear in both lists (e.g., 'MAHAVEER MOTORS 33091', 'SAYAN MOTORS HONDA'), the calculated metrics such as total applications, no banking hit percentage, and approval percentage are completely different from the ground truth.",1.1,0,0,"SELECT
+  Dealer_Name_Supplier__c,
+  COUNT(*) AS total_applications,
+  COUNT(
+    CASE
+      WHEN NOT (
+        FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%'
+        OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%'
+      )
+      THEN 1
+    END
+  ) AS no_banking_model_hits,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(
+        CASE
+          WHEN NOT (
+            FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%'
+            OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%'
+          )
+          THEN 1
+        END
+      ),
+      COUNT(*)
+    ) * 100,
+    2
+  ) AS no_banking_hit_percentage,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(CASE WHEN BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction') THEN 1 END),
+      COUNT(*)
+    ) * 100,
+    2
+  ) AS approval_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`
+WHERE
+  DATE(LastModifiedDate) >= DATE_SUB(DATE_TRUNC(DATE_SUB(CURRENT_DATE, INTERVAL '1' MONTH), MONTH), INTERVAL '3' MONTH)
+  AND DATE(LastModifiedDate) <= LAST_DAY(DATE_SUB(CURRENT_DATE, INTERVAL '1' MONTH))
+GROUP BY
+  1
+HAVING
+  total_applications > 30
+ORDER BY
+  no_banking_hit_percentage DESC
+LIMIT 10",
+3971b6,2025-11-25 20:06:38.102899+00:00,3,2,Show me the top 10 dealers where banking model has highest no hit percentage? application count should be greater than 30 and what is the approval percentage?,Sourcing,DomainType.SOURCING,PASS,"LLM: The candidate data correctly identifies the top 10 dealers, applies the filter for application count, and provides the correct percentages. The order of the last two rows is different from the ground truth, but this is acceptable as they have the same 'no_banking_hit_percentage' and no secondary sort order was specified.",0.78,0,0,"SELECT
+  Dealer_Name_Supplier__c,
+  COUNT(*) AS total_applications,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(
+        CASE
+          WHEN NOT (
+            FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%'
+            OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%'
+          )
+          THEN 1
+        END
+      ),
+      COUNT(*)
+    ) * 100,
+    2
+  ) AS no_banking_hit_percentage,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(CASE WHEN BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction') THEN 1 END),
+      COUNT(*)
+    ) * 100,
+    2
+  ) AS approval_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`
+GROUP BY
+  Dealer_Name_Supplier__c
+HAVING
+  COUNT(*) > 30
+ORDER BY
+  no_banking_hit_percentage DESC
+LIMIT 10",
+3971b6,2025-11-25 20:07:05.892526+00:00,3,3,Show me the top 10 dealers where banking model has highest no hit percentage? application count should be greater than 30 and what is the approval percentage?,Sourcing,DomainType.SOURCING,FAIL,"LLM: The candidate data is completely different from the ground truth. The dealer names, 'no banking hit percentage', and 'approval percentage' values do not match. The candidate data incorrectly shows a 'no banking hit percentage' of 100 for all dealers, whereas the ground truth shows a range from 76% to 97%. Additionally, the candidate data includes a row with a null dealer name, which indicates a likely error in the data aggregation.",1.01,0,0,"SELECT
+  Dealer_Name_Supplier__c,
+  COUNT(*) AS total_applications,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(*) - COUNT(
+        CASE
+          WHEN FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%'
+          OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%'
+          THEN 1
+        END
+      ),
+      COUNT(*)
+    ) * 100,
+    2
+  ) AS no_banking_hit_percentage,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(CASE WHEN BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction') THEN 1 END),
+      COUNT(*)
+    ) * 100,
+    2
+  ) AS approval_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`
+WHERE
+  DATE(LastModifiedDate) >= DATE_SUB(DATE_TRUNC(DATE_SUB(CURRENT_DATE, INTERVAL '1' MONTH), MONTH), INTERVAL '3' MONTH)
+  AND DATE(LastModifiedDate) <= LAST_DAY(DATE_SUB(CURRENT_DATE, INTERVAL '1' MONTH))
+GROUP BY
+  1
+HAVING
+  total_applications > 30
+ORDER BY
+  no_banking_hit_percentage DESC
+LIMIT 10",
+3971b6,2025-11-25 20:07:22.590949+00:00,4,1,SHow me the bounce rate on 0 dpd for Assam?,Collections,DomainType.COLLECTIONS,PASS,"LLM: The candidate data correctly provides the bounce rate for Assam, which matches the ground truth value of 21.61. Although it omits the columns showing the underlying calculation, it directly and accurately answers the user's question.",0.7,0,0,"WITH MaxDate AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_dt
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  UPPER(t1.STATE) AS state_name,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN t1.Bounce_Flag = 'Y' THEN t1.AGREEMENTNO END),
+      COUNT(DISTINCT t1.AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS bounce_rate_on_0_dpd_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t1
+CROSS JOIN MaxDate
+WHERE
+  t1.BUSINESS_DATE = MaxDate.max_dt
+  AND UPPER(t1.STATE) = 'ASSAM'
+  AND t1.SOM_DPD = 0
+  AND t1.SOM_NPASTAGEID = 'REGULAR'
+  AND t1.SOM_POS > 0
+GROUP BY
+  1",
+3971b6,2025-11-25 20:07:37.963470+00:00,4,2,SHow me the bounce rate on 0 dpd for Assam?,Collections,DomainType.COLLECTIONS,PASS,"LLM: The candidate data correctly provides the requested bounce rate for Assam. Although it omits the intermediate columns used for the calculation (total and bounced accounts), it successfully answers the user's specific question.",0.71,0,0,"WITH MaxDate AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_business_date
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  t.STATE,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN t.Bounce_Flag = 'Y' THEN t.AGREEMENTNO END),
+      COUNT(DISTINCT t.AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS bounce_rate_on_0_dpd
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t
+JOIN MaxDate AS md
+  ON t.BUSINESS_DATE = md.max_business_date
+WHERE
+  t.SOM_DPD = 0
+  AND UPPER(t.STATE) = 'ASSAM'
+  AND t.SOM_NPASTAGEID = 'REGULAR'
+  AND t.SOM_POS > 0
+GROUP BY
+  t.STATE
+ORDER BY
+  bounce_rate_on_0_dpd DESC",
+3971b6,2025-11-25 20:07:53.478234+00:00,4,3,SHow me the bounce rate on 0 dpd for Assam?,Collections,DomainType.COLLECTIONS,PASS,"LLM: The candidate data provides the correct values for total accounts, bounced accounts, and the bounce rate for the specified state, matching the ground truth data exactly.",0.7,0,0,"WITH MaxDate AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS dt
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  UPPER(STATE) AS state,
+  COUNT(DISTINCT CASE WHEN Bounce_Flag = 'Y' THEN AGREEMENTNO END) AS bounced_accounts_0_dpd,
+  COUNT(DISTINCT AGREEMENTNO) AS total_0_dpd_accounts,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN Bounce_Flag = 'Y' THEN AGREEMENTNO END),
+      COUNT(DISTINCT AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS bounce_rate_0_dpd_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+WHERE
+  BUSINESS_DATE = (
+    SELECT
+      dt
+    FROM MaxDate
+  )
+  AND SOM_DPD = 0
+  AND UPPER(STATE) = 'ASSAM'
+  AND SOM_NPASTAGEID = 'REGULAR'
+  AND SOM_POS > 0
+GROUP BY
+  1
+ORDER BY
+  1",
+3971b6,2025-11-25 20:08:14.184477+00:00,5,1,What is the rejection based on CIBIL score below 650 in the last 3 months? Month on month?,Sourcing,DomainType.SOURCING,FAIL,"LLM: The user requested data for the 'last 3 months', but the candidate returned data for 4 months. While the data for the correct three months is present and accurate, the inclusion of an extra month (2025-07) does not match the user's specific time frame request.",1.03,0,0,"SELECT
+  FORMAT_DATE('%Y-%m', DATE_TRUNC(DATE(LastModifiedDate), MONTH)) AS month,
+  COUNT(*) AS total_applications_below_650_cibil,
+  COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END) AS rejected_applications_below_650_cibil,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END),
+      COUNT(*)
+    ) * 100,
+    2
+  ) AS rejection_rate_pct
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`
+WHERE
+  DATE(LastModifiedDate) >= DATE_SUB(DATE_TRUNC(DATE_SUB(CURRENT_DATE, INTERVAL '1' MONTH), MONTH), INTERVAL '3' MONTH)
+  AND DATE(LastModifiedDate) <= LAST_DAY(DATE_SUB(CURRENT_DATE, INTERVAL '1' MONTH))
+  AND NOT SAFE_CAST(CIBIL_SCORE AS INT64) IS NULL
+  AND SAFE_CAST(CIBIL_SCORE AS INT64) < 650
+GROUP BY
+  1
+ORDER BY
+  1",
+3971b6,2025-11-25 20:08:37.193036+00:00,5,2,What is the rejection based on CIBIL score below 650 in the last 3 months? Month on month?,Sourcing,DomainType.SOURCING,PASS,"LLM: The candidate data provides the correct values for total applications, rejected applications, and rejection rates for each month, perfectly matching the ground truth data. The difference in column names is acceptable as per the evaluation criteria.",0.92,0,0,"SELECT
+  FORMAT_DATE('%Y-%m', DATE_TRUNC(DATE(LastModifiedDate), MONTH)) AS month,
+  COUNT(*) AS total_applications,
+  COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END) AS rejected_applications,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END),
+      COUNT(*)
+    ) * 100,
+    2
+  ) AS rejection_rate_pct
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`
+WHERE
+  DATE(LastModifiedDate) >= DATE_TRUNC(DATE_SUB(CURRENT_DATE, INTERVAL '3' MONTH), MONTH)
+  AND DATE(LastModifiedDate) < DATE_TRUNC(CURRENT_DATE, MONTH)
+  AND SAFE_CAST(CIBIL_SCORE AS INT64) < 650
+GROUP BY
+  1
+ORDER BY
+  1",
+3971b6,2025-11-25 20:09:02.457030+00:00,5,3,What is the rejection based on CIBIL score below 650 in the last 3 months? Month on month?,Sourcing,DomainType.SOURCING,PASS,"LLM: The candidate data is a perfect match to the ground truth. Although the row order is different, the data for each month is correct, and the evaluation criteria permit ignoring sort order.",1.14,0,0,"SELECT
+  FORMAT_DATE('%Y-%m', DATE_TRUNC(DATE(LastModifiedDate), MONTH)) AS month,
+  COUNT(*) AS total_applications_with_cibil_below_650,
+  COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END) AS rejected_applications_with_cibil_below_650,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END),
+      COUNT(*)
+    ) * 100,
+    2
+  ) AS rejection_rate_pct
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`
+WHERE
+  DATE(LastModifiedDate) >= DATE_SUB(DATE_TRUNC(DATE_SUB(CURRENT_DATE, INTERVAL '1' MONTH), MONTH), INTERVAL '2' MONTH)
+  AND DATE(LastModifiedDate) <= LAST_DAY(DATE_SUB(CURRENT_DATE, INTERVAL '1' MONTH))
+  AND SAFE_CAST(CIBIL_SCORE AS INT64) < 650
+GROUP BY
+  1
+ORDER BY
+  1",
+3971b6,2025-11-25 20:09:21.953865+00:00,6,1,What is the rejection rate for applications where CIBIL score is between 300-650 in October 2025? Also list out the reason of rejections for these cases.,Sourcing,DomainType.SOURCING,ERROR,Error: 400 Unrecognized name: count_o,0.51,0,0,"WITH FilteredApplications AS (
+  SELECT
+    BRE_Sanction_Result__c,
+    SCORECARD_MODEL_DESCRIPTION_BRE__c,
+    CIBIL_SCORE
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`
+  WHERE
+    DATE(LastModifiedDate) >= '2025-10-01'
+    AND DATE(LastModifiedDate) < '2025-11-01'
+    AND SAFE_CAST(CIBIL_SCORE AS INT64) BETWEEN 300 AND 650
+)
+SELECT
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(CASE WHEN T1.BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END),
+      COUNT(*)
+    ) * 100,
+    2
+  ) AS overall_rejection_rate_pct,
+  (
+    SELECT
+      ARRAY_AGG(
+        STRUCT(
+          COALESCE(T2.SCORECARD_MODEL_DESCRIPTION_BRE__c, 'Unknown/Missing Reason') AS rejection_reason,
+          COUNT(*) AS count_of_rejections_for_reason
+        ) ORDER BY count_of_rejections_for_reason DESC
+        LIMIT 10
+      )
+    FROM FilteredApplications AS T2
+    WHERE
+      T2.BRE_Sanction_Result__c IN ('REJECT', 'Reject')
+    GROUP BY
+      COALESCE(T2.SCORECARD_MODEL_DESCRIPTION_BRE__c, 'Unknown/Missing Reason')
+  ) AS top_rejection_reasons_breakdown
+FROM FilteredApplications AS T1","400 Unrecognized name: count_of_rejections_for_reason at [26:20]; reason: invalidQuery, location: query, message: Unrecognized name: count_of_rejections_for_reason at [26:20]
+
+Location: asia-south1
+Job ID: 9084df5f-fc24-4222-a13a-76b63e370a4f
+"
+3971b6,2025-11-25 20:10:01.359562+00:00,6,2,What is the rejection rate for applications where CIBIL score is between 300-650 in October 2025? Also list out the reason of rejections for these cases.,Sourcing,DomainType.SOURCING,FAIL,"LLM: The candidate data correctly identifies the overall rejection rate in its first row. However, it fails to list the most significant rejection reason, 'Unknown Reason', which accounts for 5250 rejections. Instead, it presents this data as a second, incorrect 'Overall Rejection Rate' summary row, which is a major misrepresentation of the ground truth.",1.01,0,0,"SELECT
+  COALESCE(t.SCORECARD_MODEL_DESCRIPTION_BRE__c, 'Overall Rejection Rate') AS rejection_metric,
+  SUM(CASE WHEN t.BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 ELSE 0 END) AS rejected_count,
+  COUNT(*) AS total_applications_in_scope,
+  ROUND(
+    SAFE_DIVIDE(
+      SUM(CASE WHEN t.BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 ELSE 0 END),
+      COUNT(*)
+    ) * 100,
+    2
+  ) AS rejection_rate_pct
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25` AS t
+WHERE
+  DATE(t.LastModifiedDate) >= '2025-10-01'
+  AND DATE(t.LastModifiedDate) < '2025-11-01'
+  AND SAFE_CAST(t.CIBIL_SCORE AS INT64) BETWEEN 300 AND 650
+GROUP BY
+  GROUPING SETS (
+    (
+      t.SCORECARD_MODEL_DESCRIPTION_BRE__c
+    ),
+    ()
+  )
+ORDER BY
+  CASE WHEN t.SCORECARD_MODEL_DESCRIPTION_BRE__c IS NULL THEN 0 ELSE 1 END, /* Places 'Overall Rejection Rate' row first */
+  rejected_count DESC",
+3971b6,2025-11-25 20:10:32.163129+00:00,6,3,What is the rejection rate for applications where CIBIL score is between 300-650 in October 2025? Also list out the reason of rejections for these cases.,Sourcing,DomainType.SOURCING,FAIL,"LLM: The candidate data failed to report the main rejection reason, 'Unknown Reason', which accounts for 5250 cases. Additionally, it included a confusing and incorrect second 'Overall Rejection Rate' summary row and listed numerous irrelevant rejection reasons with zero counts, which were not present in the ground truth.",0.97,0,0,"SELECT
+  COALESCE(t2.rejection_reason, 'Overall Rejection Rate') AS rejection_reason_or_overall,
+  t2.total_applications,
+  t2.rejected_applications,
+  t2.rejection_rate_pct
+FROM (
+  SELECT
+    SCORECARD_MODEL_DESCRIPTION_BRE__c AS rejection_reason,
+    COUNT(*) AS total_applications,
+    COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END) AS rejected_applications,
+    ROUND(
+      SAFE_DIVIDE(
+        COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END),
+        COUNT(*)
+      ) * 100,
+      2
+    ) AS rejection_rate_pct
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`
+  WHERE
+    DATE(LastModifiedDate) >= '2025-10-01'
+    AND DATE(LastModifiedDate) < '2025-11-01'
+    AND SAFE_CAST(CIBIL_SCORE AS INT64) BETWEEN 300 AND 650
+  GROUP BY
+    ROLLUP (
+      SCORECARD_MODEL_DESCRIPTION_BRE__c
+    )
+) AS t2
+ORDER BY
+  CASE WHEN t2.rejection_reason IS NULL THEN 0 ELSE 1 END, /* Puts the 'Overall' row first */
+  t2.rejected_applications DESC",
+3971b6,2025-11-25 20:10:58.044633+00:00,7,1,what is the current 1-30 delinquency percentage of the portfolio in comparison with last year?,Collections,DomainType.COLLECTIONS,PASS,LLM: The candidate data correctly provides the current (4.6) and last year's (5.34) delinquency percentages. The additional date columns are considered helpful context and are permissible.,0.86,0,0,"WITH MaxDate AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS latest_date
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+), CurrentMonthPortfolio AS (
+  SELECT
+    COUNT(DISTINCT AGREEMENTNO) AS total_active_accounts,
+    COUNT(DISTINCT CASE WHEN DPD_BUCKET = 1 THEN AGREEMENTNO END) AS count_1_30_dpd_accounts
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+  WHERE
+    BUSINESS_DATE = (
+      SELECT
+        latest_date
+      FROM MaxDate
+    )
+    AND SOM_NPASTAGEID = 'REGULAR'
+    AND SOM_POS > 0
+), LastYearMonthPortfolio AS (
+  SELECT
+    COUNT(DISTINCT AGREEMENTNO) AS total_active_accounts_ly,
+    COUNT(DISTINCT CASE WHEN DPD_BUCKET = 1 THEN AGREEMENTNO END) AS count_1_30_dpd_accounts_ly
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+  WHERE
+    BUSINESS_DATE = DATE_SUB((
+      SELECT
+        latest_date
+      FROM MaxDate
+    ), INTERVAL '1' YEAR)
+    AND SOM_NPASTAGEID = 'REGULAR'
+    AND SOM_POS > 0
+)
+SELECT
+  (
+    SELECT
+      latest_date
+    FROM MaxDate
+  ) AS current_business_date,
+  COALESCE(ROUND(SAFE_DIVIDE(c.count_1_30_dpd_accounts, c.total_active_accounts) * 100, 2), 0) AS current_1_30_dpd_percentage,
+  DATE_SUB((
+    SELECT
+      latest_date
+    FROM MaxDate
+  ), INTERVAL '1' YEAR) AS last_year_business_date,
+  COALESCE(
+    ROUND(SAFE_DIVIDE(l.count_1_30_dpd_accounts_ly, l.total_active_accounts_ly) * 100, 2),
+    0
+  ) AS last_year_1_30_dpd_percentage
+FROM CurrentMonthPortfolio AS c
+CROSS JOIN LastYearMonthPortfolio AS l",
+3971b6,2025-11-25 20:11:15.357619+00:00,7,2,what is the current 1-30 delinquency percentage of the portfolio in comparison with last year?,Collections,DomainType.COLLECTIONS,FAIL,"LLM: The candidate data correctly identified the current 1-30 delinquency percentage as 4.6, but it incorrectly calculated the value for the same period last year. The candidate's value is 3.4, whereas the correct value is 5.34.",0.82,0,0,"WITH MaxDate AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_dt
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  'Current Month' AS period,
+  COUNT(DISTINCT AGREEMENTNO) AS total_accounts,
+  COUNT(DISTINCT CASE WHEN T2.DPD_BUCKET = 1 THEN T2.AGREEMENTNO END) AS current_1_30_dpd_accounts,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN T2.DPD_BUCKET = 1 THEN T2.AGREEMENTNO END),
+      COUNT(DISTINCT T2.AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS current_1_30_dpd_percentage,
+  COUNT(DISTINCT CASE WHEN T2.Delinquency_1_30_LY_Flag = 1 THEN T2.AGREEMENTNO END) AS last_year_1_30_dpd_accounts,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN T2.Delinquency_1_30_LY_Flag = 1 THEN T2.AGREEMENTNO END),
+      COUNT(DISTINCT T2.AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS last_year_1_30_dpd_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS T2
+CROSS JOIN MaxDate
+WHERE
+  T2.BUSINESS_DATE = MaxDate.max_dt
+  AND T2.SOM_NPASTAGEID = 'REGULAR'
+  AND T2.SOM_POS > 0",
+3971b6,2025-11-25 20:11:34.231415+00:00,7,3,what is the current 1-30 delinquency percentage of the portfolio in comparison with last year?,Collections,DomainType.COLLECTIONS,FAIL,"LLM: The candidate data correctly identifies the current 1-30 delinquency percentage as 4.6, but it incorrectly reports last year's percentage as 3.4 instead of the correct value of 5.34.",0.86,0,0,"WITH MaxBusinessDate AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_dt
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+), PortfolioData AS (
+  SELECT
+    AGREEMENTNO,
+    DPD_BUCKET,
+    Delinquency_1_30_LY_Flag
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+  WHERE
+    BUSINESS_DATE = (
+      SELECT
+        max_dt
+      FROM MaxBusinessDate
+    )
+    AND SOM_NPASTAGEID = 'REGULAR'
+    AND SOM_POS > 0
+)
+SELECT
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN pd.DPD_BUCKET = 1 THEN pd.AGREEMENTNO END),
+      COUNT(DISTINCT pd.AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS current_1_30_dpd_percentage,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN pd.Delinquency_1_30_LY_Flag = 1 THEN pd.AGREEMENTNO END),
+      COUNT(DISTINCT pd.AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS last_year_1_30_dpd_percentage,
+  (
+    SELECT
+      max_dt
+    FROM MaxBusinessDate
+  ) AS current_as_of_date
+FROM PortfolioData AS pd",
+3971b6,2025-11-25 20:11:48.575616+00:00,8,1,How many cases who were at 0 delinquency last year and now have slipped to 90+ ?,Collections,DomainType.COLLECTIONS,FAIL,LLM: The candidate's calculated value (60803) does not match the ground truth value (60734). The values are numerically different.,1.02,0,0,"WITH MaxBusinessDate AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_dt
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  COUNT(DISTINCT t1.AGREEMENTNO) AS cases_slipped_from_0_ly_to_90_plus_current
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t1
+INNER JOIN MaxBusinessDate AS t2
+  ON t1.BUSINESS_DATE = t2.max_dt
+WHERE
+  t1.Delinquency_0_LY_Flag = 1
+  AND t1.Delinquency_0LY_90PLUSCurrent_SLIPPAGE_Flag = 1
+  AND t1.SOM_POS > 0",
+3971b6,2025-11-25 20:12:02.180309+00:00,8,2,How many cases who were at 0 delinquency last year and now have slipped to 90+ ?,Collections,DomainType.COLLECTIONS,FAIL,LLM: The candidate's aggregated count (60803) does not match the ground truth value (60734).,0.69,0,0,"WITH MaxBusinessDate AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_dt
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  COUNT(DISTINCT AGREEMENTNO) AS cases_slipped_from_0ly_to_90plus_current
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+WHERE
+  BUSINESS_DATE = (
+    SELECT
+      max_dt
+    FROM MaxBusinessDate
+  )
+  AND Delinquency_0LY_90PLUSCurrent_SLIPPAGE_Flag = 1
+  AND SOM_POS > 0",
+3971b6,2025-11-25 20:12:16.181846+00:00,8,3,How many cases who were at 0 delinquency last year and now have slipped to 90+ ?,Collections,DomainType.COLLECTIONS,FAIL,LLM: The candidate's aggregated count (60803) does not match the ground truth value (60734).,0.8,0,0,"SELECT
+  COUNT(DISTINCT AGREEMENTNO) AS cases_slipped_0ly_to_90plus_current
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+WHERE
+  BUSINESS_DATE = (
+    SELECT
+      MAX(BUSINESS_DATE)
+    FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+  )
+  AND Delinquency_0LY_90PLUSCurrent_SLIPPAGE_Flag = 1
+  AND SOM_POS > 0",
+3971b6,2025-11-25 20:12:32.296124+00:00,9,1,Which state has the highest normalization rate for the current month in DPD BKT 1?,Collections,DomainType.COLLECTIONS,PASS,"LLM: The candidate data is a perfect match to the ground truth. The values, row count, and ranking are identical. The difference in the final column name ('normalization_rate' vs 'normalization_rate_percentage') is semantically equivalent and acceptable.",0.79,0,0,"WITH MaxDate AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_business_date
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  t.STATE,
+  COUNT(DISTINCT CASE WHEN t.DPD_BUCKET = 0 THEN t.AGREEMENTNO END) AS normalization_count,
+  COUNT(DISTINCT t.AGREEMENTNO) AS total_bucket_1_count,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN t.DPD_BUCKET = 0 THEN t.AGREEMENTNO END),
+      COUNT(DISTINCT t.AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS normalization_rate_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t
+WHERE
+  t.BUSINESS_DATE = (
+    SELECT
+      max_business_date
+    FROM MaxDate
+  )
+  AND t.SOM_DPD_BUCKET = 1
+  AND t.SOM_NPASTAGEID = 'REGULAR'
+  AND t.SOM_POS > 0
+GROUP BY
+  t.STATE
+ORDER BY
+  normalization_rate_percentage DESC
+LIMIT 5",
+3971b6,2025-11-25 20:12:47.405161+00:00,9,2,Which state has the highest normalization rate for the current month in DPD BKT 1?,Collections,DomainType.COLLECTIONS,PASS,"LLM: The candidate data is a perfect match to the ground truth. It has the same number of rows, and all corresponding data values are identical. The difference in column names is acceptable.",0.71,0,0,"WITH MaxDate AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_business_date
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  t.STATE,
+  COUNT(DISTINCT CASE WHEN t.DPD_BUCKET = 0 THEN t.AGREEMENTNO END) AS normalization_count,
+  COUNT(DISTINCT t.AGREEMENTNO) AS total_bucket_1_accounts,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN t.DPD_BUCKET = 0 THEN t.AGREEMENTNO END),
+      COUNT(DISTINCT t.AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS normalization_rate_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t
+WHERE
+  t.BUSINESS_DATE = (
+    SELECT
+      max_business_date
+    FROM MaxDate
+  )
+  AND t.SOM_DPD_BUCKET = 1
+  AND t.SOM_NPASTAGEID = 'REGULAR'
+  AND t.SOM_POS > 0
+GROUP BY
+  t.STATE
+ORDER BY
+  normalization_rate_percentage DESC
+LIMIT 5",
+3971b6,2025-11-25 20:13:03.848369+00:00,9,3,Which state has the highest normalization rate for the current month in DPD BKT 1?,Collections,DomainType.COLLECTIONS,PASS,"LLM: The candidate data is a perfect match to the ground truth. It has the same number of rows, and all corresponding data values are identical. The difference in column names is acceptable.",0.71,0,0,"WITH MaxBusinessDate AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_dt
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  t.STATE,
+  COUNT(DISTINCT CASE WHEN t.DPD_BUCKET = 0 THEN t.AGREEMENTNO END) AS normalization_count,
+  COUNT(DISTINCT t.AGREEMENTNO) AS total_bucket_1_accounts,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN t.DPD_BUCKET = 0 THEN t.AGREEMENTNO END),
+      COUNT(DISTINCT t.AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS normalization_rate_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t
+WHERE
+  t.BUSINESS_DATE = (
+    SELECT
+      max_dt
+    FROM MaxBusinessDate
+  )
+  AND t.SOM_DPD_BUCKET = 1
+  AND t.SOM_NPASTAGEID = 'REGULAR'
+  AND t.SOM_POS > 0
+GROUP BY
+  t.STATE
+ORDER BY
+  normalization_rate_percentage DESC
+LIMIT 5",
+3971b6,2025-11-25 20:13:21.407409+00:00,10,1,Which state has the highest roll forward rate for the current month in DPD BKT 2?,Collections,DomainType.COLLECTIONS,PASS,"LLM: The candidate data is a perfect match to the ground truth. All rows and corresponding values for states, counts, and rates are identical. The difference in column names ('total_bucket_1_count' vs 'total_bucket_2_count' and 'roll_forward_rate' vs 'roll_forward_rate_percentage') is ignored as per the evaluation criteria.",0.72,0,0,"WITH MaxBusinessDate AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_dt
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  t.STATE,
+  COUNT(
+    DISTINCT CASE WHEN (
+      t.DPD_BUCKET - t.SOM_DPD_BUCKET
+    ) > 0 THEN t.AGREEMENTNO END
+  ) AS roll_forward_count,
+  COUNT(DISTINCT t.AGREEMENTNO) AS total_bucket_2_count,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(
+        DISTINCT CASE WHEN (
+          t.DPD_BUCKET - t.SOM_DPD_BUCKET
+        ) > 0 THEN t.AGREEMENTNO END
+      ),
+      COUNT(DISTINCT t.AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS roll_forward_rate_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t
+CROSS JOIN MaxBusinessDate AS m
+WHERE
+  t.BUSINESS_DATE = m.max_dt
+  AND t.SOM_DPD_BUCKET = 2
+  AND t.SOM_NPASTAGEID = 'REGULAR'
+  AND t.SOM_POS > 0
+GROUP BY
+  t.STATE
+ORDER BY
+  roll_forward_rate_percentage DESC
+LIMIT 5",
+3971b6,2025-11-25 20:13:42.823473+00:00,10,2,Which state has the highest roll forward rate for the current month in DPD BKT 2?,Collections,DomainType.COLLECTIONS,PASS,"LLM: The candidate data correctly identifies the top 5 states and their roll forward rates, perfectly matching the ground truth. The additional rows provided are considered helpful context for a ranking query and do not invalidate the answer.",0.82,0,0,"WITH MaxDate AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_business_date
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  t.STATE,
+  COUNT(DISTINCT t.AGREEMENTNO) AS total_accounts_in_som_bkt_2,
+  COUNT(
+    DISTINCT CASE WHEN (
+      t.DPD_BUCKET - t.SOM_DPD_BUCKET
+    ) > 0 THEN t.AGREEMENTNO END
+  ) AS roll_forward_accounts_from_bkt_2,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(
+        DISTINCT CASE WHEN (
+          t.DPD_BUCKET - t.SOM_DPD_BUCKET
+        ) > 0 THEN t.AGREEMENTNO END
+      ),
+      COUNT(DISTINCT t.AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS roll_forward_rate_from_bkt_2
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t
+INNER JOIN MaxDate AS md
+  ON t.BUSINESS_DATE = md.max_business_date
+WHERE
+  t.SOM_DPD_BUCKET = 2 AND t.SOM_NPASTAGEID = 'REGULAR' AND t.SOM_POS > 0
+GROUP BY
+  t.STATE
+ORDER BY
+  roll_forward_rate_from_bkt_2 DESC
+LIMIT 10",
+3971b6,2025-11-25 20:14:04.657182+00:00,10,3,Which state has the highest roll forward rate for the current month in DPD BKT 2?,Collections,DomainType.COLLECTIONS,PASS,LLM: The candidate data is a perfect match to the ground truth. All rows and corresponding values are identical. The difference in column names is acceptable as per the evaluation criteria.,0.67,0,0,"WITH MaxDate AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_dt
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  t.STATE,
+  COUNT(
+    DISTINCT CASE WHEN (
+      t.DPD_BUCKET - t.SOM_DPD_BUCKET
+    ) > 0 THEN t.AGREEMENTNO END
+  ) AS roll_forward_count,
+  COUNT(DISTINCT t.AGREEMENTNO) AS total_bucket_2_accounts,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(
+        DISTINCT CASE WHEN (
+          t.DPD_BUCKET - t.SOM_DPD_BUCKET
+        ) > 0 THEN t.AGREEMENTNO END
+      ),
+      COUNT(DISTINCT t.AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS roll_forward_rate_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t
+JOIN MaxDate AS md
+  ON t.BUSINESS_DATE = md.max_dt
+WHERE
+  t.SOM_DPD_BUCKET = 2 AND t.SOM_NPASTAGEID = 'REGULAR' AND t.SOM_POS > 0
+GROUP BY
+  t.STATE
+ORDER BY
+  roll_forward_rate_percentage DESC
+LIMIT 5",
+3971b6,2025-11-25 20:14:20.004068+00:00,11,1,What is the current 90+ DPD percentage for the entire portfolio?,Collections,DomainType.COLLECTIONS,FAIL,LLM: The candidate's calculated 90+ DPD percentage (7.16) is significantly different from the ground truth value (5.36).,0.74,0,0,"WITH MaxDate AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_business_date
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  ROUND(SAFE_DIVIDE(SUM(t2.NR_90_PLUS), SUM(t2.POS)) * 100, 2) AS current_90_plus_dpd_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t2
+WHERE
+  t2.BUSINESS_DATE = (
+    SELECT
+      max_business_date
+    FROM MaxDate
+  )",
+3971b6,2025-11-25 20:14:37.311141+00:00,11,2,What is the current 90+ DPD percentage for the entire portfolio?,Collections,DomainType.COLLECTIONS,FAIL,LLM: The candidate's calculated percentage (7.16) does not match the ground truth percentage (5.36). The values are significantly different.,0.7,0,0,"WITH MaxBusinessDate AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_dt
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  ROUND(SAFE_DIVIDE(SUM(t.NR_90_PLUS), SUM(t.POS)) * 100, 2) AS current_90_plus_dpd_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t
+WHERE
+  t.BUSINESS_DATE = (
+    SELECT
+      max_dt
+    FROM MaxBusinessDate
+  )
+  AND t.POS > 0 /* Ensure only active loans with outstanding principal are considered for the total portfolio */",
+3971b6,2025-11-25 20:14:50.248503+00:00,11,3,What is the current 90+ DPD percentage for the entire portfolio?,Collections,DomainType.COLLECTIONS,FAIL,LLM: The candidate's calculated 90+ DPD percentage of 7.16 does not match the ground truth value of 5.36. The values are significantly different.,0.67,0,0,"WITH MaxDate AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_business_date
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  ROUND(SAFE_DIVIDE(SUM(t2.NR_90_PLUS), SUM(t2.POS)) * 100, 2) AS current_90_plus_dpd_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t2
+WHERE
+  t2.BUSINESS_DATE = (
+    SELECT
+      max_business_date
+    FROM MaxDate
+  )",
+3971b6,2025-11-25 20:15:02.751002+00:00,12,1,"Show me the Vintage Curve for 30+ Delinquency for loans disbursed in Jan 2024, Feb 2024, and Mar 2024? At MOB = 3, 6, 9, 12.",Collections,DomainType.COLLECTIONS,PASS,Numeric Exact Match,0.88,0,0,"WITH MaxBusinessDate AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_dt
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  DATE_TRUNC(t.DISBURSALDATE, MONTH) AS disbursal_month,
+  ROUND(SAFE_DIVIDE(SUM(t.NR_30_PLUS_3MOB), SUM(t.DR_30_PLUS_3MOB)) * 100, 2) AS mob_3_delinquency_percentage,
+  ROUND(SAFE_DIVIDE(SUM(t.NR_30_PLUS_6MOB), SUM(t.DR_30_PLUS_6MOB)) * 100, 2) AS mob_6_delinquency_percentage,
+  ROUND(SAFE_DIVIDE(SUM(t.NR_30_PLUS_9MOB), SUM(t.DR_30_PLUS_9MOB)) * 100, 2) AS mob_9_delinquency_percentage,
+  ROUND(SAFE_DIVIDE(SUM(t.NR_30_PLUS_12MOB), SUM(t.DR_30_PLUS_12MOB)) * 100, 2) AS mob_12_delinquency_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t
+CROSS JOIN MaxBusinessDate AS m
+WHERE
+  t.BUSINESS_DATE = m.max_dt
+  AND t.DISBURSALDATE >= '2024-01-01'
+  AND t.DISBURSALDATE <= '2024-03-31'
+GROUP BY
+  1
+ORDER BY
+  1",
+3971b6,2025-11-25 20:15:11.350036+00:00,12,2,"Show me the Vintage Curve for 30+ Delinquency for loans disbursed in Jan 2024, Feb 2024, and Mar 2024? At MOB = 3, 6, 9, 12.",Collections,DomainType.COLLECTIONS,PASS,Numeric Exact Match,0.79,0,0,"WITH MaxBusinessDate AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_dt
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  DATE_TRUNC(t.DISBURSALDATE, MONTH) AS disbursal_month,
+  ROUND(SAFE_DIVIDE(SUM(t.NR_30_PLUS_3MOB), SUM(t.DR_30_PLUS_3MOB)) * 100, 2) AS mob_3_delinquency_rate, /* MOB 3 Vintage 30+ Delinquency Rate */
+  ROUND(SAFE_DIVIDE(SUM(t.NR_30_PLUS_6MOB), SUM(t.DR_30_PLUS_6MOB)) * 100, 2) AS mob_6_delinquency_rate, /* MOB 6 Vintage 30+ Delinquency Rate */
+  ROUND(SAFE_DIVIDE(SUM(t.NR_30_PLUS_9MOB), SUM(t.DR_30_PLUS_9MOB)) * 100, 2) AS mob_9_delinquency_rate, /* MOB 9 Vintage 30+ Delinquency Rate */
+  ROUND(SAFE_DIVIDE(SUM(t.NR_30_PLUS_12MOB), SUM(t.DR_30_PLUS_12MOB)) * 100, 2) AS mob_12_delinquency_rate /* MOB 12 Vintage 30+ Delinquency Rate */
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t
+CROSS JOIN MaxBusinessDate AS mbd
+WHERE
+  t.BUSINESS_DATE = mbd.max_dt
+  AND t.DISBURSALDATE BETWEEN '2024-01-01' AND '2024-03-31'
+GROUP BY
+  disbursal_month
+ORDER BY
+  disbursal_month",
+3971b6,2025-11-25 20:15:23.665306+00:00,12,3,"Show me the Vintage Curve for 30+ Delinquency for loans disbursed in Jan 2024, Feb 2024, and Mar 2024? At MOB = 3, 6, 9, 12.",Collections,DomainType.COLLECTIONS,PASS,Numeric Exact Match,0.72,0,0,"WITH MaxDate AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_business_date
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  DATE_TRUNC(t.DISBURSALDATE, MONTH) AS disbursal_month,
+  ROUND(SAFE_DIVIDE(SUM(t.NR_30_PLUS_3MOB), SUM(t.DR_30_PLUS_3MOB)) * 100, 2) AS mob_3_delinquency_percentage, /* MOB 3 Rate */
+  ROUND(SAFE_DIVIDE(SUM(t.NR_30_PLUS_6MOB), SUM(t.DR_30_PLUS_6MOB)) * 100, 2) AS mob_6_delinquency_percentage, /* MOB 6 Rate */
+  ROUND(SAFE_DIVIDE(SUM(t.NR_30_PLUS_9MOB), SUM(t.DR_30_PLUS_9MOB)) * 100, 2) AS mob_9_delinquency_percentage, /* MOB 9 Rate */
+  ROUND(SAFE_DIVIDE(SUM(t.NR_30_PLUS_12MOB), SUM(t.DR_30_PLUS_12MOB)) * 100, 2) AS mob_12_delinquency_percentage /* MOB 12 Rate */
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t
+CROSS JOIN MaxDate AS md
+WHERE
+  t.BUSINESS_DATE = md.max_business_date
+  AND t.DISBURSALDATE BETWEEN '2024-01-01' AND '2024-03-31'
+  AND t.SOM_POS > 0 /* Ensure active accounts */
+GROUP BY
+  1
+ORDER BY
+  1",
+3971b6,2025-11-25 20:15:40.607293+00:00,13,1,Identify customers who have 'slipped' significantly: They were 0 DPD exactly one year ago but are 90+ DPD today?,Collections,DomainType.COLLECTIONS,PASS,"LLM: Although the `agreementno` values in the candidate data do not match the ground truth, the evaluation criteria for this specific question (ID 13) explicitly allows for this difference. The candidate successfully identified a set of customers that fit the requested profile, thus passing the check based on the special rule.",0.67,0,0,"WITH MaxDate AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS dt
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  t.AGREEMENTNO,
+  t.BUSINESS_DATE,
+  t.SOM_DPD,
+  t.DPD_BUCKET,
+  t.STATE,
+  t.CITY
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t
+JOIN MaxDate AS md
+  ON t.BUSINESS_DATE = md.dt
+WHERE
+  t.Delinquency_0LY_90PLUSCurrent_SLIPPAGE_Flag = 1
+LIMIT 10",
+3971b6,2025-11-25 20:15:57.826802+00:00,13,2,Identify customers who have 'slipped' significantly: They were 0 DPD exactly one year ago but are 90+ DPD today?,Collections,DomainType.COLLECTIONS,PASS,"LLM: The candidate data identifies a different set of 'agreementno' compared to the ground truth. However, per the special evaluation rule for this question, the result is considered a match even with different agreement numbers. The row count is identical (10 rows).",1.0,0,0,"SELECT
+  AGREEMENTNO,
+  BUSINESS_DATE,
+  SOM_DPD,
+  DPD_BUCKET
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+WHERE
+  BUSINESS_DATE = (
+    SELECT
+      MAX(BUSINESS_DATE)
+    FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+  )
+  AND Delinquency_0LY_90PLUSCurrent_SLIPPAGE_Flag = 1
+  AND SOM_POS > 0
+LIMIT 10",
+3971b6,2025-11-25 20:16:14.584791+00:00,13,3,Identify customers who have 'slipped' significantly: They were 0 DPD exactly one year ago but are 90+ DPD today?,Collections,DomainType.COLLECTIONS,PASS,"LLM: The candidate data correctly identifies 10 customers matching the slippage criteria. Although the specific 'agreementno' values differ from the ground truth, this is permissible under the special evaluation rule for this question type (question_id=13), which allows for discrepancies in IDs likely due to different data snapshot dates.",0.7,0,0,"WITH MaxDate AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS latest_business_date
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  AGREEMENTNO,
+  BUSINESS_DATE,
+  Delinquency_0LY_90PLUSCurrent_SLIPPAGE_Flag
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+WHERE
+  BUSINESS_DATE = (
+    SELECT
+      latest_business_date
+    FROM MaxDate
+  )
+  AND Delinquency_0LY_90PLUSCurrent_SLIPPAGE_Flag = 1
+LIMIT 10",
+3971b6,2025-11-25 20:16:31.096552+00:00,14,1,Analyze the portfolio risk by Ticket Size: Amount Finance and show the 90+ DPD POS % for each? highest first.,Collections,DomainType.COLLECTIONS,PASS,LLM: The candidate data correctly provides the requested columns (Ticket Size and 90+ DPD POS %) with accurate values. The data is also correctly sorted in descending order as per the user's request.,0.69,0,0,"WITH MaxDate AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_business_date
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  t2.AMTFIN_BAND,
+  ROUND(SAFE_DIVIDE(SUM(t2.NR_90_PLUS), SUM(t2.POS)) * 100, 2) AS dpd_90_plus_pos_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t2
+INNER JOIN MaxDate AS md
+  ON t2.BUSINESS_DATE = md.max_business_date
+WHERE
+  t2.SOM_POS > 0 /* Ensure active accounts */
+GROUP BY
+  t2.AMTFIN_BAND
+ORDER BY
+  dpd_90_plus_pos_percentage DESC",
+3971b6,2025-11-25 20:16:46.783500+00:00,14,2,Analyze the portfolio risk by Ticket Size: Amount Finance and show the 90+ DPD POS % for each? highest first.,Collections,DomainType.COLLECTIONS,PASS,LLM: The candidate data correctly provides the requested '90+ DPD POS %' for each 'Ticket Size' band and sorts the results from highest to lowest as requested. The values perfectly match the ground truth.,0.75,0,0,"WITH MaxDate AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_dt
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  t2.AMTFIN_BAND,
+  ROUND(SAFE_DIVIDE(SUM(t2.NR_90_PLUS), SUM(t2.POS)) * 100, 2) AS dpd_90_plus_pos_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t2
+INNER JOIN MaxDate AS md
+  ON t2.BUSINESS_DATE = md.max_dt
+WHERE
+  t2.SOM_POS > 0
+GROUP BY
+  t2.AMTFIN_BAND
+ORDER BY
+  dpd_90_plus_pos_percentage DESC",
+3971b6,2025-11-25 20:17:04.369326+00:00,14,3,Analyze the portfolio risk by Ticket Size: Amount Finance and show the 90+ DPD POS % for each? highest first.,Collections,DomainType.COLLECTIONS,PASS,LLM: The candidate data correctly calculates the 90+ DPD POS percentage for each ticket size band and sorts the results in the requested descending order. It provides a direct and accurate answer to the user's question.,0.8,0,0,"WITH MaxDate AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_business_date
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  t.AMTFIN_BAND,
+  ROUND(SAFE_DIVIDE(SUM(t.NR_90_PLUS), SUM(t.POS)) * 100, 2) AS ninety_plus_dpd_pos_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t
+JOIN MaxDate AS m
+  ON t.BUSINESS_DATE = m.max_business_date
+WHERE
+  t.SOM_POS > 0 /* Ensure we only consider active accounts */
+GROUP BY
+  t.AMTFIN_BAND
+ORDER BY
+  ninety_plus_dpd_pos_percentage DESC",

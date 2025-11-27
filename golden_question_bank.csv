@@ -194,7 +194,7 @@ WHERE
       MAX(BUSINESS_DATE)
     FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
   )
-  AND SOM_NPASTAGEID = 'REGULAR'
+  AND SOM_POS > 0
   AND Delinquency_0LY_90PLUSCurrent_SLIPPAGE_Flag = 1"
 9,Which state has the highest normalization rate for the current month in DPD BKT 1?,Collections,,"SELECT
   STATE,
@@ -226,18 +226,17 @@ WHERE BUSINESS_DATE = (SELECT MAX(BUSINESS_DATE) FROM `analytics-datapipeline-pr
 GROUP BY STATE
 ORDER BY roll_forward_rate DESC
 LIMIT 5"
-11,What is the current 90+ DPD percentage for the entire portfolio?,Collections,,"SELECT
-  BUSINESS_DATE as snapshot_date,
-  SUM(POS) as total_pos,
-  SUM(NR_90_PLUS) as pos_90_plus, -- Uses the pre-calculated 90+ variable
+11,How is the portfolio performing at MOB 3 for 30+ delinquency?,Collections,,"SELECT
+  DATE_TRUNC(BUSINESS_DATE, MONTH) as disbursal_month,
+  -- Direct calculation using pre-defined mart columns
   ROUND(SAFE_DIVIDE(
-    SUM(NR_90_PLUS),
-    SUM(POS)
-  ) * 100, 2) as dpd_90_plus_percentage
+    SUM(NR_30_PLUS_3MOB), 
+    SUM(DR_30_PLUS_3MOB)
+  ) * 100, 2) as mob_3_delinquency_percentage
 FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
 WHERE BUSINESS_DATE = (SELECT MAX(BUSINESS_DATE) FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`)
-  AND SOM_NPASTAGEID = 'REGULAR' and SOM_POS > 0
-group by BUSINESS_DATE"
+GROUP BY 1
+ORDER BY 1"
 12,"Show me the Vintage Curve for 30+ Delinquency for loans disbursed in Jan 2024, Feb 2024, and Mar 2024? At MOB = 3, 6, 9, 12.",Collections,,"SELECT
   DATE_TRUNC(DISBURSALDATE, MONTH) as disbursal_month,
   -- MOB 3 Rate

@@ -62,7 +62,7 @@ class IntentRouterAgent(BaseAgent):
                 'funnel', 'bre', 'sanction', 'manufacturer', 'dealer',
                 'branch', 'rejected', 'accepted', 'abnd', 'asset cost',
                 'login', 'logins', 'lead', 'leads', 'onboarding', 'CIBIL',
-                'scorecard', 'cyclops',
+                'scorecard', 'cyclops', 'banking'
             ],
             'patterns': [
                 r'\bapproval\s+rate\b',
@@ -116,7 +116,7 @@ Response: COLLECTIONS
 Question: "Give me top 10 dealer names that have the highest NNS3 percentage and cases are more than 30 per dealer? Show the number of cases"
 Response: COLLECTIONS
 
-Question: "What is the disbursal trend of Superbikes?"    
+Question: "What is the rejection based on CIBIL score below 650 in the last 3 months? Month on month?"    
 Response: SOURCING
 
 Question: "What is the rejection rate for applications where CIBIL score is between 300-650 in October 2025? Also list out the reason of rejections for these cases"
