@@ -204,13 +204,9 @@ class OrchestratorAgent(BaseAgent):
     def _format_response(self, sql_response, execution_response) -> str:
         """Format execution results as markdown table"""
         output = []
-        
-        if sql_response.explanation:
-            output.append(f"**{sql_response.explanation}**\n")
-        
+
         if execution_response.rows:
             columns = execution_response.columns
-            output.append("**Query Results:**\n")
             output.append("| " + " | ".join(columns) + " |")
             output.append("| " + " | ".join(["---"] * len(columns)) + " |")
             
@@ -224,7 +220,7 @@ class OrchestratorAgent(BaseAgent):
             output.append("No results found.")
         
         output.append(f"\n---\n**Stats:** {execution_response.row_count} rows, {execution_response.execution_time_ms:.0f}ms")
-        output.append(f"\n```sql\n{sql_response.sql_query}\n```")
+        # output.append(f"\n```sql\n{sql_response.sql_query}\n```") # Removed to avoid duplicate display in UI
         
         return "\n".join(output)
     

@@ -386,7 +386,7 @@ def run_query_sync_wrapper(user_question: str, session_id: str, history: list):
     except Exception as e:
         logger.error(f"Query execution error: {e}", exc_info=True)
         return {
-            "answer": f"❌ Error: {str(e)}",
+            "answer": f"Error: {str(e)}",
             "sql_query": "",
             "domain": "Unknown"
         }
@@ -396,7 +396,7 @@ def run_query_sync_wrapper(user_question: str, session_id: str, history: list):
 
 def authenticate():
     """Handle user authentication"""
-    st.sidebar.title("🔐 Login")
+    st.sidebar.title("Login")
 
     if st.session_state.get("authenticated"):
         st.sidebar.success(f"Welcome, {st.session_state.get('username')}!")
@@ -580,7 +580,7 @@ def main():
                 logger.warning(f"Could not create DataFrame: {e}")
 
         except Exception as e:
-            error_message = f"❌ Error: {str(e)}"
+            error_message = f"Error: {str(e)}"
             message_placeholder.error(error_message)
             logger.error(error_message, exc_info=True)
             st.session_state.history[-1] = (user_query, error_message, "Error")
@@ -684,19 +684,6 @@ def main():
                 else:
                     st.info("Please select at least one Y-axis column.")
 
-        # Download CSV
-        csv_bytes = st.session_state.get("csv_bytes")
-        if csv_bytes:
-            with buttons:
-                st.write("")
-                st.download_button(
-                    label="⬇️ Download CSV",
-                    data=csv_bytes,
-                    file_name="copilot_output.csv",
-                    mime="text/csv",
-                    key="download_csv_button",
-                    help="Download the output table as CSV"
-                )
 
         # Feedback buttons
         with buttons:
@@ -740,10 +727,10 @@ def main():
 
 # Entry point
 if __name__ == "__main__":
-    main()
-    # Uncomment for authentication
-    # if authenticate():
-    #     main()
-    # else:
-    #     st.info("Please log in to continue.")
-    #     st.stop()
+    #main()
+    #Uncomment for authentication
+    if authenticate():
+        main()
+    else:
+        st.info("Please log in to continue.")
+        st.stop()
