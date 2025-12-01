@@ -1,0 +1,2304 @@
+run_id,batch_number,timestamp,question_id,question,expected_domain,actual_domain,status,reason,latency_seconds,input_tokens,output_tokens,generated_sql,thought_process,column_selected,error_message
+97f8f1,1,2025-12-01 21:15:40.573282+00:00,1,what is the current 0+ performance for dealer categories?,Collections,COLLECTIONS,PASS,LLM: The candidate data is a perfect match to the reference data. All rows and corresponding values are identical. The difference in column order is ignored as per the evaluation criteria.,1.0,0,0,"SELECT
+  Supplier_Categorization__Credit_Team,
+  COUNT(DISTINCT CASE WHEN DPD > 0 THEN AGREEMENTNO END) AS col_0_plus_dpd_accounts,
+  COUNT(DISTINCT AGREEMENTNO) AS total_accounts,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN DPD > 0 THEN AGREEMENTNO END),
+      COUNT(DISTINCT AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS col_0_plus_dpd_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+WHERE
+  BUSINESS_DATE = (
+    SELECT
+      MAX(BUSINESS_DATE)
+    FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+  )
+  AND POS > 0
+  AND NPASTAGEID = 'REGULAR'
+GROUP BY
+  Supplier_Categorization__Credit_Team
+ORDER BY
+  col_0_plus_dpd_percentage DESC","Metric: 0+ DPD (DPD > 0). Grouping: Dealer Categories (Supplier_Categorization__Credit_Team). Time: Current (MAX BUSINESS_DATE). Scenario 3 (Standard Portfolio Performance) applies, so filter `POS > 0 AND NPASTAGEID = 'REGULAR'`.","['0+ DPD: DPD', 'Dealer Categories: Supplier_Categorization__Credit_Team']",
+97f8f1,1,2025-12-01 21:15:50.204027+00:00,2,what are the last 3 months disbursals where datasutram model score is more than 500?,Sourcing,SOURCING,ERROR,SQL Error: 400 Syntax error: Expected end,0.41,3242,453,"select the count of disbursals and filter by the date and score condition.
+I will also add a `LIMIT 10` as it's not an aggregation by a specific dimension.{
+  ""thought_process"": ""The user is asking for 'disbursals', which falls under Scenario B, requiring `DISBURSALDATE` and `DISBURSALDATE IS NOT NULL`. The time frame is 'last 3 months'. A specific filter is applied: 'datasutram model score is more than 500'. As per instructions, `Datasutram_score__c` must be `SAFE_CAST` to `INT64` for numeric comparison. The query will count the number of such disbursals."",
+  ""column_mapping"": {
+    ""Disbursal Date"": ""DISBURSALDATE"",
+    ""Datasutram Model Score"": ""Datasutram_score__c""
+  },
+  ""sql"": ""SELECT COUNT(*) AS total_disbursals FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25` WHERE DISBURSALDATE >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH) AND DISBURSALDATE IS NOT NULL AND SAFE_CAST(Datasutram_score__c AS INT64) > 500""
+}",No thought process returned.,[],"400 Syntax error: Expected end of input but got keyword OF at [1:18]; reason: invalidQuery, location: query, message: Syntax error: Expected end of input but got keyword OF at [1:18]
+
+Location: US
+Job ID: 7b0a54c4-cc55-436f-bc77-768b80550ffa
+"
+97f8f1,1,2025-12-01 21:16:01.193761+00:00,3,what is the percentage of disbursed cases for last 3 months month on month out of total disbursed for final_application_scorecard model category BH_BKNH_PH? ,Sourcing,SOURCING,ERROR,SQL Error: 400 Syntax error: Unexpected i,0.34,3254,1906,"thought_process
+The user is asking for the percentage of disbursed cases month-on-month for a specific `FINAL_APPLICANT_SCORECARD_MODEL_BRE` category (`BH_BKNH_PH`).
+This is a disbursal-related metric, so I will use `DISBURSALDATE` and filter for `DISBURSALDATE IS NOT NULL`.
+The time window is ""last 3 months month on month"", which means I need to group by month and filter for the last 3 full months.
+The specific model category is `BH_BKNH_PH`.
+I need to calculate the count of disbursed cases for this category for each month and then divide it by the total disbursed cases for that month (within the specified category) to get the percentage.
+The question asks for ""percentage of disbursed cases for last 3 months month on month out of total disbursed for final_application_scorecard model category BH_BKNH_PH"". This implies:
+1. Filter for `FINAL_APPLICANT_SCORECARD_MODEL_BRE = 'BH_BKNH_PH'`.
+2. Filter for `DISBURSALDATE IS NOT NULL` and within the last 3 months.
+3. Group by month of `DISBURSALDATE`.
+4. Calculate the count of disbursed cases for each month.
+5. The ""out of total disbursed for final_application_scorecard model category BH_BKNH_PH"" part is a bit ambiguous. It could mean:
+    a) Percentage of `BH_BKNH_PH` disbursed cases in a month relative to *all* `BH_BKNH_PH` disbursed cases in the last 3 months.
+    b) Percentage of `BH_BKNH_PH` disbursed cases in a month relative to *all* disbursed cases in that month (regardless of model category).
+
+Given the phrasing ""out of total disbursed for final_application_scorecard model category BH_BKNH_PH"", it sounds like the denominator should be the total disbursed cases *within that specific model category* over the entire 3-month period, and the numerator is the monthly count for that category.
+
+Let's re-read: ""percentage of disbursed cases for last 3 months month on month out of total disbursed for final_application_scorecard model category BH_BKNH_PH"".
+This means:
+- Filter for `FINAL_APPLICANT_SCORECARD_MODEL_BRE = 'BH_BKNH_PH'`.
+- Filter for `DISBURSALDATE IS NOT NULL`.
+- Filter for `DISBURSALDATE` within the last 3 months.
+- Calculate the total count of disbursed cases for `BH_BKNH_PH` in the last 3 months.
+- For each month within the last 3 months, calculate the count of disbursed cases for `BH_BKNH_PH`.
+- Divide the monthly count by the total 3-month count to get the percentage.
+
+Let's define ""last 3 months"" for disbursals. It means `DISBURSALDATE >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH)`.
+However, ""month on month"" usually implies full calendar months. So, it should be `DATE_TRUNC(DISBURSALDATE, MONTH) >= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH), MONTH)`.
+To get the last 3 *full* months, it's better to use `DATE_TRUNC(DISBURSALDATE, MONTH) >= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH), MONTH)` and `DATE_TRUNC(DISBURSALDATE, MONTH) < DATE_TRUNC(CURRENT_DATE(), MONTH)`.
+
+Let's refine the date logic for ""last 3 months month on month"".
+If today is 2023-11-20, ""last 3 months"" would typically mean August, September, October.
+So, `DISBURSALDATE >= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH), MONTH)` and `DISBURSALDATE < DATE_TRUNC(CURRENT_DATE(), MONTH)`.
+
+Steps:
+1. Filter for `DISBURSALDATE IS NOT NULL`.
+2. Filter for `FINAL_APPLICANT_SCORECARD_MODEL_BRE = 'BH_BKNH_PH'`.
+3. Filter for the last 3 full months based on `DISBURSALDATE`.
+4. Calculate the total count of disbursed cases for the specified model and period.
+5. Group by month of `DISBURSALDATE`.
+6. Calculate the count for each month.
+7. Calculate the percentage of each month's count relative to the total count.
+
+Let's consider the date range for ""last 3 months month on month"".
+If `CURRENT_DATE()` is '2023-11-20', then `DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH)` is '2023-08-20'.
+`DATE_TRUNC('2023-08-20', MONTH)` is '2023-08-01'.
+`DATE_TRUNC(CURRENT_DATE(), MONTH)` is '2023-11-01'.
+So the filter `DISBURSALDATE >= '2023-08-01' AND DISBURSALDATE < '2023-11-01'` will cover August, September, October. This seems correct for ""last 3 months month on month"".
+
+The question asks for ""percentage of disbursed cases for last 3 months month on month out of total disbursed for final_application_scorecard model category BH_BKNH_PH"".
+This means:
+- Numerator: Count of disbursed cases for `BH_BKNH_PH` in a specific month.
+- Denominator: Total count of disbursed cases for `BH_BKNH_PH` across the entire 3-month period.
+
+So, I'll calculate the total count first, then monthly counts, and then the percentage.{
+  ""thought_process"": ""The user is asking for the month-on-month percentage of disbursed cases for a specific scorecard model category ('BH_BKNH_PH') over the last 3 full months. This is a disbursal-related metric, so I will use `DISBURSALDATE` and filter for `DISBURSALDATE IS NOT NULL`. The date range will cover the last three complete calendar months. I will first calculate the total disbursed cases for the specified model category within this 3-month period. Then, I will calculate the monthly disbursed cases for the same category and period. Finally, I will compute the percentage of each month's count relative to the total 3-month count."",
+  ""column_mapping"": {
+    ""Disbursed Cases"": ""DISBURSALDATE IS NOT NULL"",
+    ""Scorecard Model Category"": ""FINAL_APPLICANT_SCORECARD_MODEL_BRE"",
+    ""Disbursal Date"": ""DISBURSALDATE""
+  },
+  ""sql"": ""WITH MonthlyDisbursals AS (\n    SELECT\n        DATE_TRUNC(DISBURSALDATE, MONTH) AS disbursal_month,\n        COUNT(*) AS monthly_disbursed_count\n    FROM\n        `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`\n    WHERE\n        DISBURSALDATE IS NOT NULL\n        AND FINAL_APPLICANT_SCORECARD_MODEL_BRE = 'BH_BKNH_PH'\n        AND DATE_TRUNC(DISBURSALDATE, MONTH) >= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH), MONTH)\n        AND DATE_TRUNC(DISBURSALDATE, MONTH) < DATE_TRUNC(CURRENT_DATE(), MONTH)\n    GROUP BY\n        1\n),\nTotalDisbursals AS (\n    SELECT\n        SUM(monthly_disbursed_count) AS total_disbursed_for_category\n    FROM\n        MonthlyDisbursals\n)\nSELECT\n    FORMAT_DATE('%Y-%m', m.disbursal_month) AS disbursal_month,\n    m.monthly_disbursed_count,\n    ROUND(SAFE_DIVIDE(m.monthly_disbursed_count, t.total_disbursed_for_category) * 100, 2) AS percentage_of_total_disbursed\nFROM\n    MonthlyDisbursals m,\n    TotalDisbursals t\nORDER BY\n    m.disbursal_month;""
+}",No thought process returned.,[],"400 Syntax error: Unexpected identifier ""thought_process"" at [1:1]; reason: invalidQuery, location: query, message: Syntax error: Unexpected identifier ""thought_process"" at [1:1]
+
+Location: US
+Job ID: 36b6ba33-abfa-47be-a5ba-0ae1f7863f86
+"
+97f8f1,1,2025-12-01 21:16:17.979492+00:00,4,what are the percentage of last 3 months disbursals in S10 category of CRIF Index?,Sourcing,SOURCING,FAIL,LLM: The candidate's calculated percentage of 0 is incorrect. The reference value is 12.77. The difference of 12.77 is well outside the 1% numeric tolerance. [Data_Mismatch],0.88,3240,249,"SELECT
+  ROUND(
+    SAFE_DIVIDE(COUNT(CASE WHEN CRIF_SCORE_BAND = 'S10' THEN 1 END), COUNT(*)) * 100,
+    2
+  ) AS percentage_s10_disbursals
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`
+WHERE
+  DISBURSALDATE >= DATE_SUB(CURRENT_DATE, INTERVAL '3' MONTH)
+  AND NOT DISBURSALDATE IS NULL","Metric: Percentage of disbursals. Scenario B (Disbursals) for date filtering. Date field: DISBURSALDATE, filtered for last 3 months and IS NOT NULL. Dimension: CRIF Index S10 category, using CRIF_SCORE_BAND. Calculate the percentage of S10 disbursals out of total disbursals in the period.","['Disbursal Date: DISBURSALDATE', 'CRIF Index Category: CRIF_SCORE_BAND']",
+97f8f1,1,2025-12-01 21:16:38.015789+00:00,5,What is GNS4 trend for last 4 months?,Collections,COLLECTIONS,PASS,LLM: The candidate data contains all the correct rows from the reference data. The difference in row order is acceptable as the user's question did not specify a particular sort order.,0.87,0,0,"WITH max_business_date AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_date
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  DATE_TRUNC(t1.BUSINESS_DATE, MONTH) AS month,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN t1.Bounce_Flag = 'Y' THEN t1.AGREEMENTNO END),
+      COUNT(DISTINCT t1.AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS gns4_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t1
+CROSS JOIN max_business_date AS t2
+WHERE
+  t1.BUSINESS_DATE >= DATE_SUB(t2.max_date, INTERVAL '4' MONTH)
+  AND t1.MOB_ON_INSTL_START_DATE = 4
+  AND t1.SOM_NPASTAGEID = 'REGULAR'
+  AND t1.SOM_POS > 0
+GROUP BY
+  1
+ORDER BY
+  1 DESC",Metric: GNS4 Rate (Bounce='Y' at MOB 4). Scenario 1 (Bounce Analysis) applies. Logic: Filter MOB_ON_INSTL_START_DATE = 4 AND Bounce_Flag = 'Y'. Exclusions: SOM_NPASTAGEID = 'REGULAR' and SOM_POS > 0. Time: Last 4 months relative to MAX date.,"['GNS4: Bounce_Flag, MOB_ON_INSTL_START_DATE', 'Time: BUSINESS_DATE']",
+97f8f1,1,2025-12-01 21:16:46.394644+00:00,6,Show me the top 10 dealers where banking model has highest no hit percentage? application count should be greater than 30 and what is the approval percentage?,Sourcing,SOURCING,ERROR,SQL Error: 400 Syntax error: Unexpected i,0.36,3251,975,"thought_process
+The user is asking for the top 10 dealers based on the ""no hit percentage"" of the banking model, with a minimum application count of 30. Additionally, they want the approval percentage for these dealers.
+
+1.  **Metric**: ""No hit percentage"" for banking model. This means applications where `FINAL_APPLICANT_SCORECARD_MODEL_BRE` does NOT contain `'%_BKH%'` or `'%_BKR%'`.
+2.  **Dimension**: Dealer (`Dealer_Name_Supplier__c`).
+3.  **Filter**: Application count > 30.
+4.  **Additional Metric**: Approval percentage.
+5.  **Date Logic**: The request is about ""no hit percentage"" and ""approval percentage"", which falls under Scenario A (Sourcing). No specific date range is mentioned, so the default ""Last 3 Months"" will be applied using `DATE(LastModifiedDate)`.
+6.  **Column Mapping**:
+    *   Dealer: `Dealer_Name_Supplier__c`
+    *   Banking Hit: `FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%' OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%'`
+    *   Approval Status: `BRE_Sanction_Result__c`
+    *   Date: `LastModifiedDate`
+
+**Steps:**
+1.  Calculate total applications per dealer.
+2.  Calculate applications where banking model had ""no hit"" per dealer.
+3.  Calculate approved applications per dealer.
+4.  Calculate ""no hit percentage"" and ""approval percentage"".
+5.  Filter for dealers with total applications > 30.
+6.  Order by ""no hit percentage"" in descending order and take the top 10.{
+  ""thought_process"": ""The user wants to identify the top 10 dealers with the highest 'no banking hit' percentage, along with their approval percentage. The 'no banking hit' is defined as cases where the FINAL_APPLICANT_SCORECARD_MODEL_BRE does not contain '%_BKH%' or '%_BKR%'. The request implies sourcing data, so 'LastModifiedDate' is used. No specific date range was mentioned, so the default 'Last 3 Months' is applied. A minimum application count of 30 is required for each dealer. The approval status is determined by 'BRE_Sanction_Result__c' being 'ACCEPT' or 'Sanction'."",
+  ""column_mapping"": {
+    ""Dealer Name"": ""Dealer_Name_Supplier__c"",
+    ""Banking Hit Status"": ""FINAL_APPLICANT_SCORECARD_MODEL_BRE"",
+    ""Approval Status"": ""BRE_Sanction_Result__c"",
+    ""Application Date"": ""LastModifiedDate""
+  },
+  ""sql"": ""SELECT\n    Dealer_Name_Supplier__c AS dealer_name,\n    COUNT(*) AS total_applications,\n    COUNT(CASE WHEN NOT (FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%' OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%') THEN 1 END) AS no_banking_hit_count,\n    ROUND(SAFE_DIVIDE(COUNT(CASE WHEN NOT (FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%' OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%') THEN 1 END), COUNT(*)) * 100, 2) AS no_banking_hit_percentage,\n    COUNT(CASE WHEN BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction') THEN 1 END) AS approved_applications,\n    ROUND(SAFE_DIVIDE(COUNT(CASE WHEN BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction') THEN 1 END), COUNT(*)) * 100, 2) AS approval_percentage\nFROM\n    `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`\nWHERE\n    DATE(LastModifiedDate) >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH)\nGROUP BY\n    1\nHAVING\n    total_applications > 30\nORDER BY\n    no_banking_hit_percentage DESC\nLIMIT 10""
+}",No thought process returned.,[],"400 Syntax error: Unexpected identifier ""thought_process"" at [1:1]; reason: invalidQuery, location: query, message: Syntax error: Unexpected identifier ""thought_process"" at [1:1]
+
+Location: US
+Job ID: 6ae3b4e5-5ec2-4153-99fc-2b331a859530
+"
+97f8f1,1,2025-12-01 21:17:06.375165+00:00,7,What is the rejection based on CIBIL score below 650 in the last 3 months? Month on month?,Sourcing,SOURCING,PASS,"LLM: The candidate data correctly provides the number of rejected applications for each month, matching the values in the reference data. While it omits other metrics like total applications and rejection rate, it directly and accurately answers the user's specific question.",1.44,3244,317,"SELECT
+  DATE_TRUNC(DATE(LastModifiedDate), MONTH) AS month,
+  COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END) AS rejected_applications
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`
+WHERE
+  DATE(LastModifiedDate) >= DATE_SUB(CURRENT_DATE, INTERVAL '3' MONTH)
+  AND SAFE_CAST(CIBIL_SCORE AS INT64) < 650
+GROUP BY
+  1
+ORDER BY
+  1","Metric: Rejection count. Dimension: Month-on-month. Filter: CIBIL score below 650. Scenario A (Sourcing) applies, so using `LastModifiedDate` and filtering for the last 3 months. `CIBIL_SCORE` is a STRING and needs `SAFE_CAST` to `INT64` for numeric comparison. Rejection is defined by `BRE_Sanction_Result__c`.","['Rejection Status: BRE_Sanction_Result__c', 'CIBIL Score: CIBIL_SCORE', 'Application Date: LastModifiedDate']",
+97f8f1,1,2025-12-01 21:17:12.442958+00:00,8,What is the rejection rate for applications where CIBIL score is between 300-650 in October 2025? Also list out the reason of rejections for these cases.,Sourcing,SOURCING,ERROR,SQL Error: 400 Syntax error: Unexpected i,0.41,3260,797,"thought_process
+The user is asking for the rejection rate and reasons for applications with a specific CIBIL score range in a given month.
+This falls under Scenario A (Sourcing, Approvals, Rejections, Volume) for date logic, so `LastModifiedDate` will be used.
+The CIBIL score range is 300-650, which maps to `CIBIL_SCORE`. This column is a STRING, so it needs `SAFE_CAST` to `INT64` for numeric comparison.
+Rejection status is defined by `BRE_Sanction_Result__c IN ('REJECT', 'Reject')`.
+The rejection reason is not explicitly available as a single column in the provided schema. I will assume the user is asking for the `SCORECARD_MODEL_DESCRIPTION_BRE__c` or similar descriptive field that might contain rejection reasons. Given the schema, `SCORECARD_MODEL_DESCRIPTION_BRE__c` seems like the most appropriate field for ""reason of rejections"".
+
+Steps:
+1.  Filter by `LastModifiedDate` for October 2025.
+2.  Filter by `CIBIL_SCORE` between 300 and 650 (inclusive), casting `CIBIL_SCORE` to `INT64`.
+3.  Calculate the total number of applications in this segment.
+4.  Calculate the number of rejected applications in this segment.
+5.  Calculate the rejection rate.
+6.  Group by `SCORECARD_MODEL_DESCRIPTION_BRE__c` to list rejection reasons for these cases.{
+  ""thought_process"": ""Metric: Rejection Rate and Reasons. Scenario A (Sourcing) for date logic, using `LastModifiedDate`. Date filter for October 2025. Filter by CIBIL score range (300-650), requiring `SAFE_CAST` for `CIBIL_SCORE`. Rejection status is defined by `BRE_Sanction_Result__c`. The 'reason of rejections' is mapped to `SCORECARD_MODEL_DESCRIPTION_BRE__c` as it's the most relevant descriptive field in the schema for such information."",
+  ""column_mapping"": {
+    ""CIBIL Score"": ""CIBIL_SCORE"",
+    ""Rejection Status"": ""BRE_Sanction_Result__c"",
+    ""Rejection Reason"": ""SCORECARD_MODEL_DESCRIPTION_BRE__c"",
+    ""Application Date"": ""LastModifiedDate""
+  },
+  ""sql"": ""SELECT\n    SCORECARD_MODEL_DESCRIPTION_BRE__c AS rejection_reason,\n    COUNT(*) AS total_applications_in_segment,\n    COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END) AS rejected_applications,\n    ROUND(SAFE_DIVIDE(COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END), COUNT(*)) * 100, 2) AS rejection_rate_pct\nFROM\n    `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`\nWHERE\n    DATE(LastModifiedDate) >= '2025-10-01'\n    AND DATE(LastModifiedDate) < '2025-11-01'\n    AND SAFE_CAST(CIBIL_SCORE AS INT64) BETWEEN 300 AND 650\nGROUP BY\n    rejection_reason\nORDER BY\n    rejected_applications DESC;""
+}",No thought process returned.,[],"400 Syntax error: Unexpected identifier ""thought_process"" at [1:1]; reason: invalidQuery, location: query, message: Syntax error: Unexpected identifier ""thought_process"" at [1:1]
+
+Location: US
+Job ID: f6c6f854-6a71-49c9-92fd-0d8742ae21d8
+"
+97f8f1,1,2025-12-01 21:17:31.313748+00:00,9,Which state has the highest roll forward rate for the current month in DPD BKT 2?,Collections,COLLECTIONS,PASS,"LLM: The candidate data correctly identifies the state with the highest roll forward rate, and all corresponding values for roll count, total accounts, and the rate itself are identical to the reference data.",0.84,0,0,"SELECT
+  STATE,
+  COUNT(DISTINCT CASE WHEN (
+    DPD_BUCKET - SOM_DPD_BUCKET
+  ) > 0 THEN AGREEMENTNO END) AS roll_forward_count,
+  COUNT(DISTINCT AGREEMENTNO) AS total_bucket_2_count,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN (
+        DPD_BUCKET - SOM_DPD_BUCKET
+      ) > 0 THEN AGREEMENTNO END),
+      COUNT(DISTINCT AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS roll_forward_rate
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+WHERE
+  BUSINESS_DATE = (
+    SELECT
+      MAX(BUSINESS_DATE)
+    FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+  )
+  AND SOM_DPD_BUCKET = 2
+  AND NPASTAGEID = 'REGULAR'
+  AND POS > 0
+GROUP BY
+  STATE
+ORDER BY
+  roll_forward_rate DESC
+LIMIT 1","Metric: Roll Forward Rate (DPD_BUCKET > SOM_DPD_BUCKET). Population: SOM_DPD_BUCKET = 2. Scenario 3 (Standard Portfolio Performance) applies, so filter `POS > 0 AND NPASTAGEID = 'REGULAR'`. Time: Current month, so filter `BUSINESS_DATE = (SELECT MAX(BUSINESS_DATE) FROM ...)`. Group by STATE and order by roll forward rate descending to find the highest.","['Roll Forward Rate: DPD_BUCKET, SOM_DPD_BUCKET', 'State: STATE', 'Current Month: BUSINESS_DATE']",
+97f8f1,1,2025-12-01 21:17:49.583678+00:00,10,Analyze the portfolio risk by Ticket Size: Amount Finance and show the 90+ DPD POS % for each? highest first.,Collections,COLLECTIONS,PASS,LLM: The candidate data correctly extracts the requested columns (Amount Finance band and 90+ DPD POS %) and presents them in the correct descending order as specified by the user. All data points match the reference data exactly.,0.71,0,0,"SELECT
+  AMTFIN_BAND,
+  ROUND(SAFE_DIVIDE(SUM(NR_90_PLUS), SUM(POS)) * 100, 2) AS ninety_plus_dpd_pos_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+WHERE
+  BUSINESS_DATE = (
+    SELECT
+      MAX(BUSINESS_DATE)
+    FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+  )
+  AND POS > 0
+GROUP BY
+  1
+ORDER BY
+  ninety_plus_dpd_pos_percentage DESC",Metric: 90+ DPD POS %. User explicitly asks for '90+ DPD'. CRITICAL: I MUST use the pre-calculated column `NR_90_PLUS` (numerator) and `POS` (denominator). I must NOT try to calculate this using DPD_BUCKET filters. Scenario 2 (Risk) applies (filter POS > 0 only). Grouping by 'Ticket Size: Amount Finance' which maps to `AMTFIN_BAND`. Time: Current snapshot (MAX BUSINESS_DATE). Order by percentage highest first.,"['Ticket Size: AMTFIN_BAND', '90+ DPD Risk: NR_90_PLUS / POS']",
+97f8f1,2,2025-12-01 21:18:13.422512+00:00,1,what is the current 0+ performance for dealer categories?,Collections,COLLECTIONS,PASS,"LLM: The candidate data is a perfect match to the reference data. All rows and values are identical, differing only in column order which is acceptable per the evaluation criteria.",0.72,0,0,"SELECT
+  Supplier_Categorization__Credit_Team,
+  COUNT(DISTINCT CASE WHEN DPD > 0 THEN AGREEMENTNO END) AS col_0_plus_dpd_accounts,
+  COUNT(DISTINCT AGREEMENTNO) AS total_accounts,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN DPD > 0 THEN AGREEMENTNO END),
+      COUNT(DISTINCT AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS col_0_plus_dpd_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+WHERE
+  BUSINESS_DATE = (
+    SELECT
+      MAX(BUSINESS_DATE)
+    FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+  )
+  AND POS > 0
+  AND NPASTAGEID = 'REGULAR'
+GROUP BY
+  Supplier_Categorization__Credit_Team
+ORDER BY
+  col_0_plus_dpd_percentage DESC","Metric: 0+ DPD (DPD > 0). Grouping: Dealer Categories (Supplier_Categorization__Credit_Team). Time: Current (MAX BUSINESS_DATE). Scenario 3 (Standard Portfolio Performance) applies, so filter `POS > 0 AND NPASTAGEID = 'REGULAR'`.","['0+ DPD: DPD', 'Dealer Categories: Supplier_Categorization__Credit_Team']",
+97f8f1,2,2025-12-01 21:18:47.434775+00:00,2,what are the last 3 months disbursals where datasutram model score is more than 500?,Sourcing,COLLECTIONS,FAIL,"LLM: The candidate returned a disbursal count of 0, while the reference data indicates the correct count is 146,806. The values are completely different. [Data_Mismatch]",0.72,0,0,"WITH DateAnchor AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_business_date
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  COUNT(DISTINCT t1.AGREEMENTNO) AS disbursals_count
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t1
+CROSS JOIN DateAnchor AS da
+WHERE
+  t1.DISBURSALDATE >= DATE_SUB(da.max_business_date, INTERVAL '3' MONTH)
+  AND t1.DISBURSALDATE <= da.max_business_date
+  AND t1.EWS_Model_Score > 500","The user is asking for a count of 'disbursals' (unique agreements) within a specific time frame ('last 3 months') and with a condition on 'datasutram model score'. This is a vintage-like analysis, so according to the CRITICAL RULE for Vintage Analysis, I must filter by `DISBURSALDATE` range and NOT by `BUSINESS_DATE`. The 'last 3 months' for `DISBURSALDATE` will be relative to the `MAX(BUSINESS_DATE)` in the table. The `EWS_Model_Score` filter is applied directly. No specific 3-way switch scenario applies as this is about the initial cohort of disbursed loans, not current portfolio performance, bounce, or write-off status.","['Disbursals: AGREEMENTNO', 'Disbursal Date: DISBURSALDATE', 'Datasutram Model Score: EWS_Model_Score']",
+97f8f1,2,2025-12-01 21:18:57.936578+00:00,3,what is the percentage of disbursed cases for last 3 months month on month out of total disbursed for final_application_scorecard model category BH_BKNH_PH? ,Sourcing,SOURCING,ERROR,SQL Error: 400 Syntax error: Unexpected i,0.42,3254,1906,"thought_process
+The user is asking for the percentage of disbursed cases month-on-month for a specific `FINAL_APPLICANT_SCORECARD_MODEL_BRE` category (`BH_BKNH_PH`).
+This is a disbursal-related metric, so I will use `DISBURSALDATE` and filter for `DISBURSALDATE IS NOT NULL`.
+The time window is ""last 3 months month on month"", which means I need to group by month and filter for the last 3 full months.
+The specific model category is `BH_BKNH_PH`.
+I need to calculate the count of disbursed cases for this category for each month and then divide it by the total disbursed cases for that month (within the specified category) to get the percentage.
+The question asks for ""percentage of disbursed cases for last 3 months month on month out of total disbursed for final_application_scorecard model category BH_BKNH_PH"". This implies:
+1. Filter for `FINAL_APPLICANT_SCORECARD_MODEL_BRE = 'BH_BKNH_PH'`.
+2. Filter for `DISBURSALDATE IS NOT NULL` and within the last 3 months.
+3. Group by month of `DISBURSALDATE`.
+4. Calculate the count of disbursed cases for each month.
+5. The ""out of total disbursed for final_application_scorecard model category BH_BKNH_PH"" part is a bit ambiguous. It could mean:
+    a) Percentage of `BH_BKNH_PH` disbursed cases in a month relative to *all* `BH_BKNH_PH` disbursed cases in the last 3 months.
+    b) Percentage of `BH_BKNH_PH` disbursed cases in a month relative to *all* disbursed cases in that month (regardless of model category).
+
+Given the phrasing ""out of total disbursed for final_application_scorecard model category BH_BKNH_PH"", it sounds like the denominator should be the total disbursed cases *within that specific model category* over the entire 3-month period, and the numerator is the monthly count for that category.
+
+Let's re-read: ""percentage of disbursed cases for last 3 months month on month out of total disbursed for final_application_scorecard model category BH_BKNH_PH"".
+This means:
+- Filter for `FINAL_APPLICANT_SCORECARD_MODEL_BRE = 'BH_BKNH_PH'`.
+- Filter for `DISBURSALDATE IS NOT NULL`.
+- Filter for `DISBURSALDATE` within the last 3 months.
+- Calculate the total count of disbursed cases for `BH_BKNH_PH` in the last 3 months.
+- For each month within the last 3 months, calculate the count of disbursed cases for `BH_BKNH_PH`.
+- Divide the monthly count by the total 3-month count to get the percentage.
+
+Let's define ""last 3 months"" for disbursals. It means `DISBURSALDATE >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH)`.
+However, ""month on month"" usually implies full calendar months. So, it should be `DATE_TRUNC(DISBURSALDATE, MONTH) >= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH), MONTH)`.
+To get the last 3 *full* months, it's better to use `DATE_TRUNC(DISBURSALDATE, MONTH) >= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH), MONTH)` and `DATE_TRUNC(DISBURSALDATE, MONTH) < DATE_TRUNC(CURRENT_DATE(), MONTH)`.
+
+Let's refine the date logic for ""last 3 months month on month"".
+If today is 2023-11-20, ""last 3 months"" would typically mean August, September, October.
+So, `DISBURSALDATE >= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH), MONTH)` and `DISBURSALDATE < DATE_TRUNC(CURRENT_DATE(), MONTH)`.
+
+Steps:
+1. Filter for `DISBURSALDATE IS NOT NULL`.
+2. Filter for `FINAL_APPLICANT_SCORECARD_MODEL_BRE = 'BH_BKNH_PH'`.
+3. Filter for the last 3 full months based on `DISBURSALDATE`.
+4. Calculate the total count of disbursed cases for the specified model and period.
+5. Group by month of `DISBURSALDATE`.
+6. Calculate the count for each month.
+7. Calculate the percentage of each month's count relative to the total count.
+
+Let's consider the date range for ""last 3 months month on month"".
+If `CURRENT_DATE()` is '2023-11-20', then `DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH)` is '2023-08-20'.
+`DATE_TRUNC('2023-08-20', MONTH)` is '2023-08-01'.
+`DATE_TRUNC(CURRENT_DATE(), MONTH)` is '2023-11-01'.
+So the filter `DISBURSALDATE >= '2023-08-01' AND DISBURSALDATE < '2023-11-01'` will cover August, September, October. This seems correct for ""last 3 months month on month"".
+
+The question asks for ""percentage of disbursed cases for last 3 months month on month out of total disbursed for final_application_scorecard model category BH_BKNH_PH"".
+This means:
+- Numerator: Count of disbursed cases for `BH_BKNH_PH` in a specific month.
+- Denominator: Total count of disbursed cases for `BH_BKNH_PH` across the entire 3-month period.
+
+So, I'll calculate the total count first, then monthly counts, and then the percentage.{
+  ""thought_process"": ""The user is asking for the month-on-month percentage of disbursed cases for a specific scorecard model category ('BH_BKNH_PH') over the last 3 full months. This is a disbursal-related metric, so I will use `DISBURSALDATE` and filter for `DISBURSALDATE IS NOT NULL`. The date range will cover the last three complete calendar months. I will first calculate the total disbursed cases for the specified model category within this 3-month period. Then, I will calculate the monthly disbursed cases for the same category and period. Finally, I will compute the percentage of each month's count relative to the total 3-month count."",
+  ""column_mapping"": {
+    ""Disbursed Cases"": ""DISBURSALDATE IS NOT NULL"",
+    ""Scorecard Model Category"": ""FINAL_APPLICANT_SCORECARD_MODEL_BRE"",
+    ""Disbursal Date"": ""DISBURSALDATE""
+  },
+  ""sql"": ""WITH MonthlyDisbursals AS (\n    SELECT\n        DATE_TRUNC(DISBURSALDATE, MONTH) AS disbursal_month,\n        COUNT(*) AS monthly_disbursed_count\n    FROM\n        `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`\n    WHERE\n        DISBURSALDATE IS NOT NULL\n        AND FINAL_APPLICANT_SCORECARD_MODEL_BRE = 'BH_BKNH_PH'\n        AND DATE_TRUNC(DISBURSALDATE, MONTH) >= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH), MONTH)\n        AND DATE_TRUNC(DISBURSALDATE, MONTH) < DATE_TRUNC(CURRENT_DATE(), MONTH)\n    GROUP BY\n        1\n),\nTotalDisbursals AS (\n    SELECT\n        SUM(monthly_disbursed_count) AS total_disbursed_for_category\n    FROM\n        MonthlyDisbursals\n)\nSELECT\n    FORMAT_DATE('%Y-%m', m.disbursal_month) AS disbursal_month,\n    m.monthly_disbursed_count,\n    ROUND(SAFE_DIVIDE(m.monthly_disbursed_count, t.total_disbursed_for_category) * 100, 2) AS percentage_of_total_disbursed\nFROM\n    MonthlyDisbursals m,\n    TotalDisbursals t\nORDER BY\n    m.disbursal_month;""
+}",No thought process returned.,[],"400 Syntax error: Unexpected identifier ""thought_process"" at [1:1]; reason: invalidQuery, location: query, message: Syntax error: Unexpected identifier ""thought_process"" at [1:1]
+
+Location: US
+Job ID: fde291b8-7bb9-4b61-886d-b0c197a5e1b8
+"
+97f8f1,2,2025-12-01 21:19:11.885060+00:00,4,what are the percentage of last 3 months disbursals in S10 category of CRIF Index?,Sourcing,SOURCING,FAIL,LLM: The candidate's calculated percentage of 0 is incorrect. The reference value is 12.77. The difference is significant and exceeds the 1% numeric tolerance. [Data_Mismatch],0.92,3240,258,"SELECT
+  ROUND(
+    SAFE_DIVIDE(COUNT(CASE WHEN CRIF_SCORE_BAND = 'S10' THEN 1 END), COUNT(*)) * 100,
+    2
+  ) AS percentage_disbursals_in_s10
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`
+WHERE
+  DISBURSALDATE >= DATE_SUB(CURRENT_DATE, INTERVAL '3' MONTH)
+  AND NOT DISBURSALDATE IS NULL","Metric: Percentage of disbursals in a specific CRIF score band. Scenario B (Disbursals) is triggered by 'disbursals'. Date field: DISBURSALDATE, filtered for NOT NULL and last 3 months. Dimension: CRIF_SCORE_BAND. Calculation involves counting disbursals within the 'S10' band and dividing by total disbursals for the period.","['Disbursal Date: DISBURSALDATE', 'CRIF Score Band: CRIF_SCORE_BAND']",
+97f8f1,2,2025-12-01 21:19:28.482268+00:00,5,What is GNS4 trend for last 4 months?,Collections,COLLECTIONS,PASS,LLM: The candidate data contains all the correct rows and values from the reference data. The difference in row order is acceptable as the user's question about a 'trend' does not mandate a specific sort order.,0.71,0,0,"WITH MaxBusinessDate AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_date
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  DATE_TRUNC(t1.BUSINESS_DATE, MONTH) AS month,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN t1.Bounce_Flag = 'Y' THEN t1.AGREEMENTNO END),
+      COUNT(DISTINCT t1.AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS gns4_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t1
+CROSS JOIN MaxBusinessDate AS mbd
+WHERE
+  t1.BUSINESS_DATE >= DATE_SUB(mbd.max_date, INTERVAL '4' MONTH)
+  AND t1.MOB_ON_INSTL_START_DATE = 4
+  AND t1.SOM_NPASTAGEID = 'REGULAR'
+  AND t1.SOM_POS > 0
+GROUP BY
+  1
+ORDER BY
+  1 DESC",Metric: GNS4 Rate (Bounce='Y' at MOB 4). Scenario 1 (Bounce Analysis) applies. Logic: Filter MOB_ON_INSTL_START_DATE = 4 AND Bounce_Flag = 'Y'. Exclusions: SOM_NPASTAGEID = 'REGULAR' and SOM_POS > 0. Time: Last 4 months relative to MAX date. The trend implies grouping by month.,"['GNS4: Bounce_Flag, MOB_ON_INSTL_START_DATE', 'Time: BUSINESS_DATE']",
+97f8f1,2,2025-12-01 21:19:35.654550+00:00,6,Show me the top 10 dealers where banking model has highest no hit percentage? application count should be greater than 30 and what is the approval percentage?,Sourcing,SOURCING,ERROR,SQL Error: 400 Syntax error: Unexpected i,0.34,3251,975,"thought_process
+The user is asking for the top 10 dealers based on the ""no hit percentage"" of the banking model, with a minimum application count of 30. Additionally, they want the approval percentage for these dealers.
+
+1.  **Metric**: ""No hit percentage"" for banking model. This means applications where `FINAL_APPLICANT_SCORECARD_MODEL_BRE` does NOT contain `'%_BKH%'` or `'%_BKR%'`.
+2.  **Dimension**: Dealer (`Dealer_Name_Supplier__c`).
+3.  **Filter**: Application count > 30.
+4.  **Additional Metric**: Approval percentage.
+5.  **Date Logic**: The request is about ""no hit percentage"" and ""approval percentage"", which falls under Scenario A (Sourcing). No specific date range is mentioned, so the default ""Last 3 Months"" will be applied using `DATE(LastModifiedDate)`.
+6.  **Column Mapping**:
+    *   Dealer: `Dealer_Name_Supplier__c`
+    *   Banking Hit: `FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%' OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%'`
+    *   Approval Status: `BRE_Sanction_Result__c`
+    *   Date: `LastModifiedDate`
+
+**Steps:**
+1.  Calculate total applications per dealer.
+2.  Calculate applications where banking model had ""no hit"" per dealer.
+3.  Calculate approved applications per dealer.
+4.  Calculate ""no hit percentage"" and ""approval percentage"".
+5.  Filter for dealers with total applications > 30.
+6.  Order by ""no hit percentage"" in descending order and take the top 10.{
+  ""thought_process"": ""The user wants to identify the top 10 dealers with the highest 'no banking hit' percentage, along with their approval percentage. The 'no banking hit' is defined as cases where the FINAL_APPLICANT_SCORECARD_MODEL_BRE does not contain '%_BKH%' or '%_BKR%'. The request implies sourcing data, so 'LastModifiedDate' is used. No specific date range was mentioned, so the default 'Last 3 Months' is applied. A minimum application count of 30 is required for each dealer. The approval status is determined by 'BRE_Sanction_Result__c' being 'ACCEPT' or 'Sanction'."",
+  ""column_mapping"": {
+    ""Dealer Name"": ""Dealer_Name_Supplier__c"",
+    ""Banking Hit Status"": ""FINAL_APPLICANT_SCORECARD_MODEL_BRE"",
+    ""Approval Status"": ""BRE_Sanction_Result__c"",
+    ""Application Date"": ""LastModifiedDate""
+  },
+  ""sql"": ""SELECT\n    Dealer_Name_Supplier__c AS dealer_name,\n    COUNT(*) AS total_applications,\n    COUNT(CASE WHEN NOT (FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%' OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%') THEN 1 END) AS no_banking_hit_count,\n    ROUND(SAFE_DIVIDE(COUNT(CASE WHEN NOT (FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%' OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%') THEN 1 END), COUNT(*)) * 100, 2) AS no_banking_hit_percentage,\n    COUNT(CASE WHEN BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction') THEN 1 END) AS approved_applications,\n    ROUND(SAFE_DIVIDE(COUNT(CASE WHEN BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction') THEN 1 END), COUNT(*)) * 100, 2) AS approval_percentage\nFROM\n    `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`\nWHERE\n    DATE(LastModifiedDate) >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH)\nGROUP BY\n    1\nHAVING\n    total_applications > 30\nORDER BY\n    no_banking_hit_percentage DESC\nLIMIT 10""
+}",No thought process returned.,[],"400 Syntax error: Unexpected identifier ""thought_process"" at [1:1]; reason: invalidQuery, location: query, message: Syntax error: Unexpected identifier ""thought_process"" at [1:1]
+
+Location: US
+Job ID: 6ff9611d-f80d-4047-b475-0dcbc1b49c21
+"
+97f8f1,2,2025-12-01 21:19:56.086152+00:00,7,What is the rejection based on CIBIL score below 650 in the last 3 months? Month on month?,Sourcing,SOURCING,PASS,"LLM: The candidate data correctly provides the number of rejected applications for each month, matching the values in the reference data. While it omits other metrics like total applications and rejection rate, it directly and accurately answers the user's specific question.",1.02,3244,358,"SELECT
+  DATE_TRUNC(DATE(LastModifiedDate), MONTH) AS month,
+  COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END) AS rejected_applications
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`
+WHERE
+  DATE(LastModifiedDate) >= DATE_SUB(CURRENT_DATE, INTERVAL '3' MONTH)
+  AND SAFE_CAST(CIBIL_SCORE AS INT64) < 650
+GROUP BY
+  1
+ORDER BY
+  1","The user is asking for rejection data, which falls under Scenario A (Sourcing). The date field to use is `LastModifiedDate`, and it needs to be wrapped in `DATE()`. The time window is 'last 3 months', and the output should be 'month on month', so we'll group by month. The filter is 'CIBIL score below 650'. `CIBIL_SCORE` is a STRING and needs to be `SAFE_CAST` to `INT64` for numeric comparison. Rejection is defined by `BRE_Sanction_Result__c IN ('REJECT', 'Reject')`.","['Rejection Status: BRE_Sanction_Result__c', 'CIBIL Score: CIBIL_SCORE', 'Application Date: LastModifiedDate']",
+97f8f1,2,2025-12-01 21:20:06.939916+00:00,8,What is the rejection rate for applications where CIBIL score is between 300-650 in October 2025? Also list out the reason of rejections for these cases.,Sourcing,SOURCING,ERROR,SQL Error: 400 Unrecognized name: REJECTI,0.55,3260,452,"SELECT
+  COUNT(*) AS total_applications,
+  COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END) AS rejected_applications,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END),
+      COUNT(*)
+    ) * 100,
+    2
+  ) AS rejection_rate_pct,
+  ARRAY_AGG(
+    STRUCT(REJECTION_REASON__c, COUNT(1) AS reason_count) IGNORE NULLS ORDER BY COUNT(1) DESC
+    LIMIT 5
+  ) AS top_rejection_reasons
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`
+WHERE
+  DATE(LastModifiedDate) >= '2025-10-01'
+  AND DATE(LastModifiedDate) < '2025-11-01'
+  AND SAFE_CAST(CIBIL_SCORE AS INT64) BETWEEN 300 AND 650","The user is asking for the rejection rate and specific rejection reasons for applications within a defined CIBIL score range and a specific month. This falls under Scenario A (Sourcing, Approvals, Rejections), so `LastModifiedDate` is used for date filtering. The CIBIL score is a STRING and needs `SAFE_CAST` to INT64 for numeric comparison. The query calculates the overall rejection rate and then uses `ARRAY_AGG` to list the top 5 rejection reasons for the rejected applications within the specified criteria.","['CIBIL score: CIBIL_SCORE', 'Rejection Status: BRE_Sanction_Result__c', 'Rejection Reason: REJECTION_REASON__c', 'Application Date: LastModifiedDate']","400 Unrecognized name: REJECTION_REASON__c at [12:12]; reason: invalidQuery, location: query, message: Unrecognized name: REJECTION_REASON__c at [12:12]
+
+Location: asia-south1
+Job ID: a85858f2-5bd3-4569-a986-ed7ad83fb2db
+"
+97f8f1,2,2025-12-01 21:20:20.747922+00:00,9,Which state has the highest roll forward rate for the current month in DPD BKT 2?,Collections,COLLECTIONS,PASS,"LLM: The candidate data correctly identified the state with the highest roll forward rate, and all corresponding values match the reference data exactly.",0.69,0,0,"SELECT
+  STATE,
+  COUNT(DISTINCT CASE WHEN DPD_BUCKET > SOM_DPD_BUCKET THEN AGREEMENTNO END) AS roll_forward_count,
+  COUNT(DISTINCT AGREEMENTNO) AS total_bucket_2_accounts,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN DPD_BUCKET > SOM_DPD_BUCKET THEN AGREEMENTNO END),
+      COUNT(DISTINCT AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS roll_forward_rate
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+WHERE
+  BUSINESS_DATE = (
+    SELECT
+      MAX(BUSINESS_DATE)
+    FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+  )
+  AND SOM_DPD_BUCKET = 2
+  AND POS > 0
+  AND NPASTAGEID = 'REGULAR'
+GROUP BY
+  STATE
+ORDER BY
+  roll_forward_rate DESC
+LIMIT 1","Metric: Roll Forward Rate (DPD_BUCKET > SOM_DPD_BUCKET). Population: SOM_DPD_BUCKET = 2. Scenario 3 (Standard Portfolio Performance) applies, so filter by POS > 0 AND NPASTAGEID = 'REGULAR'. Time: Current month, so filter by BUSINESS_DATE = MAX(BUSINESS_DATE). Group by STATE and order by roll forward rate descending to find the highest.","['Roll Forward Rate: DPD_BUCKET, SOM_DPD_BUCKET', 'DPD Bucket: SOM_DPD_BUCKET', 'State: STATE', 'Current Month: BUSINESS_DATE']",
+97f8f1,2,2025-12-01 21:20:37.796328+00:00,10,Analyze the portfolio risk by Ticket Size: Amount Finance and show the 90+ DPD POS % for each? highest first.,Collections,COLLECTIONS,PASS,"LLM: The candidate data correctly identifies the requested dimension (Amount Finance bands) and the metric (90+ DPD POS %), and sorts the results in the correct descending order. All data points match the reference data exactly.",0.72,0,0,"SELECT
+  AMTFIN_BAND,
+  ROUND(SAFE_DIVIDE(SUM(NR_90_PLUS), SUM(POS)) * 100, 2) AS ninety_plus_dpd_pos_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+WHERE
+  BUSINESS_DATE = (
+    SELECT
+      MAX(BUSINESS_DATE)
+    FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+  )
+  AND POS > 0
+GROUP BY
+  1
+ORDER BY
+  ninety_plus_dpd_pos_percentage DESC",Metric: 90+ DPD POS %. User explicitly asks for '90+ DPD'. CRITICAL: I MUST use the pre-calculated column `NR_90_PLUS` (numerator) and `POS` (denominator). I must NOT try to calculate this using DPD_BUCKET filters. Grouping: 'Ticket Size: Amount Finance' maps to `AMTFIN_BAND`. Scenario 2 (Risk) applies (filter POS > 0 only). Time: Current snapshot (MAX BUSINESS_DATE). Ordering: Highest first.,"['Ticket Size: AMTFIN_BAND', '90+ DPD Risk: NR_90_PLUS / POS']",
+97f8f1,3,2025-12-01 21:20:59.960810+00:00,1,what is the current 0+ performance for dealer categories?,Collections,COLLECTIONS,PASS,LLM: The candidate data is a perfect match to the reference data. All rows and values are identical. The difference in column order is ignored per the evaluation criteria.,0.69,0,0,"SELECT
+  Supplier_Categorization__Credit_Team,
+  COUNT(DISTINCT CASE WHEN DPD > 0 THEN AGREEMENTNO END) AS col_0_plus_dpd_accounts,
+  COUNT(DISTINCT AGREEMENTNO) AS total_accounts,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN DPD > 0 THEN AGREEMENTNO END),
+      COUNT(DISTINCT AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS col_0_plus_dpd_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+WHERE
+  BUSINESS_DATE = (
+    SELECT
+      MAX(BUSINESS_DATE)
+    FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+  )
+  AND POS > 0
+  AND NPASTAGEID = 'REGULAR'
+GROUP BY
+  Supplier_Categorization__Credit_Team
+ORDER BY
+  col_0_plus_dpd_percentage DESC","Metric: 0+ DPD (DPD > 0). Grouping: Dealer Categories (Supplier_Categorization__Credit_Team). Time: Current (MAX BUSINESS_DATE). Scenario 3 (Standard Portfolio Performance) applies, so filter `POS > 0 AND NPASTAGEID = 'REGULAR'`.","['0+ DPD: DPD', 'Dealer Categories: Supplier_Categorization__Credit_Team']",
+97f8f1,3,2025-12-01 21:21:08.716605+00:00,2,what are the last 3 months disbursals where datasutram model score is more than 500?,Sourcing,SOURCING,ERROR,SQL Error: 400 Syntax error: Expected end,0.36,3242,453,"select the count of disbursals and filter by the date and score condition.
+I will also add a `LIMIT 10` as it's not an aggregation by a specific dimension.{
+  ""thought_process"": ""The user is asking for 'disbursals', which falls under Scenario B, requiring `DISBURSALDATE` and `DISBURSALDATE IS NOT NULL`. The time frame is 'last 3 months'. A specific filter is applied: 'datasutram model score is more than 500'. As per instructions, `Datasutram_score__c` must be `SAFE_CAST` to `INT64` for numeric comparison. The query will count the number of such disbursals."",
+  ""column_mapping"": {
+    ""Disbursal Date"": ""DISBURSALDATE"",
+    ""Datasutram Model Score"": ""Datasutram_score__c""
+  },
+  ""sql"": ""SELECT COUNT(*) AS total_disbursals FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25` WHERE DISBURSALDATE >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH) AND DISBURSALDATE IS NOT NULL AND SAFE_CAST(Datasutram_score__c AS INT64) > 500""
+}",No thought process returned.,[],"400 Syntax error: Expected end of input but got keyword OF at [1:18]; reason: invalidQuery, location: query, message: Syntax error: Expected end of input but got keyword OF at [1:18]
+
+Location: US
+Job ID: b05d0f02-043c-40d9-a1f4-79e4df2c0010
+"
+97f8f1,3,2025-12-01 21:21:19.203709+00:00,3,what is the percentage of disbursed cases for last 3 months month on month out of total disbursed for final_application_scorecard model category BH_BKNH_PH? ,Sourcing,SOURCING,ERROR,SQL Error: 400 Syntax error: Unexpected i,0.33,3254,1906,"thought_process
+The user is asking for the percentage of disbursed cases month-on-month for a specific `FINAL_APPLICANT_SCORECARD_MODEL_BRE` category (`BH_BKNH_PH`).
+This is a disbursal-related metric, so I will use `DISBURSALDATE` and filter for `DISBURSALDATE IS NOT NULL`.
+The time window is ""last 3 months month on month"", which means I need to group by month and filter for the last 3 full months.
+The specific model category is `BH_BKNH_PH`.
+I need to calculate the count of disbursed cases for this category for each month and then divide it by the total disbursed cases for that month (within the specified category) to get the percentage.
+The question asks for ""percentage of disbursed cases for last 3 months month on month out of total disbursed for final_application_scorecard model category BH_BKNH_PH"". This implies:
+1. Filter for `FINAL_APPLICANT_SCORECARD_MODEL_BRE = 'BH_BKNH_PH'`.
+2. Filter for `DISBURSALDATE IS NOT NULL` and within the last 3 months.
+3. Group by month of `DISBURSALDATE`.
+4. Calculate the count of disbursed cases for each month.
+5. The ""out of total disbursed for final_application_scorecard model category BH_BKNH_PH"" part is a bit ambiguous. It could mean:
+    a) Percentage of `BH_BKNH_PH` disbursed cases in a month relative to *all* `BH_BKNH_PH` disbursed cases in the last 3 months.
+    b) Percentage of `BH_BKNH_PH` disbursed cases in a month relative to *all* disbursed cases in that month (regardless of model category).
+
+Given the phrasing ""out of total disbursed for final_application_scorecard model category BH_BKNH_PH"", it sounds like the denominator should be the total disbursed cases *within that specific model category* over the entire 3-month period, and the numerator is the monthly count for that category.
+
+Let's re-read: ""percentage of disbursed cases for last 3 months month on month out of total disbursed for final_application_scorecard model category BH_BKNH_PH"".
+This means:
+- Filter for `FINAL_APPLICANT_SCORECARD_MODEL_BRE = 'BH_BKNH_PH'`.
+- Filter for `DISBURSALDATE IS NOT NULL`.
+- Filter for `DISBURSALDATE` within the last 3 months.
+- Calculate the total count of disbursed cases for `BH_BKNH_PH` in the last 3 months.
+- For each month within the last 3 months, calculate the count of disbursed cases for `BH_BKNH_PH`.
+- Divide the monthly count by the total 3-month count to get the percentage.
+
+Let's define ""last 3 months"" for disbursals. It means `DISBURSALDATE >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH)`.
+However, ""month on month"" usually implies full calendar months. So, it should be `DATE_TRUNC(DISBURSALDATE, MONTH) >= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH), MONTH)`.
+To get the last 3 *full* months, it's better to use `DATE_TRUNC(DISBURSALDATE, MONTH) >= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH), MONTH)` and `DATE_TRUNC(DISBURSALDATE, MONTH) < DATE_TRUNC(CURRENT_DATE(), MONTH)`.
+
+Let's refine the date logic for ""last 3 months month on month"".
+If today is 2023-11-20, ""last 3 months"" would typically mean August, September, October.
+So, `DISBURSALDATE >= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH), MONTH)` and `DISBURSALDATE < DATE_TRUNC(CURRENT_DATE(), MONTH)`.
+
+Steps:
+1. Filter for `DISBURSALDATE IS NOT NULL`.
+2. Filter for `FINAL_APPLICANT_SCORECARD_MODEL_BRE = 'BH_BKNH_PH'`.
+3. Filter for the last 3 full months based on `DISBURSALDATE`.
+4. Calculate the total count of disbursed cases for the specified model and period.
+5. Group by month of `DISBURSALDATE`.
+6. Calculate the count for each month.
+7. Calculate the percentage of each month's count relative to the total count.
+
+Let's consider the date range for ""last 3 months month on month"".
+If `CURRENT_DATE()` is '2023-11-20', then `DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH)` is '2023-08-20'.
+`DATE_TRUNC('2023-08-20', MONTH)` is '2023-08-01'.
+`DATE_TRUNC(CURRENT_DATE(), MONTH)` is '2023-11-01'.
+So the filter `DISBURSALDATE >= '2023-08-01' AND DISBURSALDATE < '2023-11-01'` will cover August, September, October. This seems correct for ""last 3 months month on month"".
+
+The question asks for ""percentage of disbursed cases for last 3 months month on month out of total disbursed for final_application_scorecard model category BH_BKNH_PH"".
+This means:
+- Numerator: Count of disbursed cases for `BH_BKNH_PH` in a specific month.
+- Denominator: Total count of disbursed cases for `BH_BKNH_PH` across the entire 3-month period.
+
+So, I'll calculate the total count first, then monthly counts, and then the percentage.{
+  ""thought_process"": ""The user is asking for the month-on-month percentage of disbursed cases for a specific scorecard model category ('BH_BKNH_PH') over the last 3 full months. This is a disbursal-related metric, so I will use `DISBURSALDATE` and filter for `DISBURSALDATE IS NOT NULL`. The date range will cover the last three complete calendar months. I will first calculate the total disbursed cases for the specified model category within this 3-month period. Then, I will calculate the monthly disbursed cases for the same category and period. Finally, I will compute the percentage of each month's count relative to the total 3-month count."",
+  ""column_mapping"": {
+    ""Disbursed Cases"": ""DISBURSALDATE IS NOT NULL"",
+    ""Scorecard Model Category"": ""FINAL_APPLICANT_SCORECARD_MODEL_BRE"",
+    ""Disbursal Date"": ""DISBURSALDATE""
+  },
+  ""sql"": ""WITH MonthlyDisbursals AS (\n    SELECT\n        DATE_TRUNC(DISBURSALDATE, MONTH) AS disbursal_month,\n        COUNT(*) AS monthly_disbursed_count\n    FROM\n        `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`\n    WHERE\n        DISBURSALDATE IS NOT NULL\n        AND FINAL_APPLICANT_SCORECARD_MODEL_BRE = 'BH_BKNH_PH'\n        AND DATE_TRUNC(DISBURSALDATE, MONTH) >= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH), MONTH)\n        AND DATE_TRUNC(DISBURSALDATE, MONTH) < DATE_TRUNC(CURRENT_DATE(), MONTH)\n    GROUP BY\n        1\n),\nTotalDisbursals AS (\n    SELECT\n        SUM(monthly_disbursed_count) AS total_disbursed_for_category\n    FROM\n        MonthlyDisbursals\n)\nSELECT\n    FORMAT_DATE('%Y-%m', m.disbursal_month) AS disbursal_month,\n    m.monthly_disbursed_count,\n    ROUND(SAFE_DIVIDE(m.monthly_disbursed_count, t.total_disbursed_for_category) * 100, 2) AS percentage_of_total_disbursed\nFROM\n    MonthlyDisbursals m,\n    TotalDisbursals t\nORDER BY\n    m.disbursal_month;""
+}",No thought process returned.,[],"400 Syntax error: Unexpected identifier ""thought_process"" at [1:1]; reason: invalidQuery, location: query, message: Syntax error: Unexpected identifier ""thought_process"" at [1:1]
+
+Location: US
+Job ID: 25e8f121-0f78-409e-9f72-be1960cc97ac
+"
+97f8f1,3,2025-12-01 21:21:33.097719+00:00,4,what are the percentage of last 3 months disbursals in S10 category of CRIF Index?,Sourcing,SOURCING,FAIL,LLM: The candidate value '0' is incorrect. The reference value is '12.77'. The difference is well outside the 1% numeric tolerance. [Data_Mismatch],0.92,3240,258,"SELECT
+  ROUND(
+    SAFE_DIVIDE(COUNT(CASE WHEN CRIF_SCORE_BAND = 'S10' THEN 1 END), COUNT(*)) * 100,
+    2
+  ) AS percentage_disbursals_in_s10
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`
+WHERE
+  DISBURSALDATE >= DATE_SUB(CURRENT_DATE, INTERVAL '3' MONTH)
+  AND NOT DISBURSALDATE IS NULL","Metric: Percentage of disbursals in a specific CRIF score band. Scenario B (Disbursals) is triggered by 'disbursals'. Date field: DISBURSALDATE, filtered for NOT NULL and last 3 months. Dimension: CRIF_SCORE_BAND. Calculation involves counting disbursals within the 'S10' band and dividing by total disbursals for the period.","['Disbursal Date: DISBURSALDATE', 'CRIF Score Band: CRIF_SCORE_BAND']",
+97f8f1,3,2025-12-01 21:21:49.231803+00:00,5,What is GNS4 trend for last 4 months?,Collections,COLLECTIONS,PASS,LLM: The candidate data contains all the correct rows from the reference data. The difference in row order is acceptable as the user's question did not specify a particular sort order.,0.82,0,0,"WITH max_business_date AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_date
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  DATE_TRUNC(t1.BUSINESS_DATE, MONTH) AS month,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN t1.Bounce_Flag = 'Y' THEN t1.AGREEMENTNO END),
+      COUNT(DISTINCT t1.AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS gns4_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t1
+CROSS JOIN max_business_date AS t2
+WHERE
+  t1.BUSINESS_DATE >= DATE_SUB(t2.max_date, INTERVAL '4' MONTH)
+  AND t1.MOB_ON_INSTL_START_DATE = 4
+  AND t1.SOM_NPASTAGEID = 'REGULAR'
+  AND t1.SOM_POS > 0
+GROUP BY
+  1
+ORDER BY
+  1 DESC",Metric: GNS4 Rate (Bounce='Y' at MOB 4). Scenario 1 (Bounce Analysis) applies. Logic: Filter MOB_ON_INSTL_START_DATE = 4 AND Bounce_Flag = 'Y'. Exclusions: SOM_NPASTAGEID = 'REGULAR' and SOM_POS > 0. Time: Last 4 months relative to MAX date.,"['GNS4: Bounce_Flag, MOB_ON_INSTL_START_DATE', 'Time: BUSINESS_DATE']",
+97f8f1,3,2025-12-01 21:21:56.489501+00:00,6,Show me the top 10 dealers where banking model has highest no hit percentage? application count should be greater than 30 and what is the approval percentage?,Sourcing,SOURCING,ERROR,SQL Error: 400 Syntax error: Unexpected i,0.35,3251,975,"thought_process
+The user is asking for the top 10 dealers based on the ""no hit percentage"" of the banking model, with a minimum application count of 30. Additionally, they want the approval percentage for these dealers.
+
+1.  **Metric**: ""No hit percentage"" for banking model. This means applications where `FINAL_APPLICANT_SCORECARD_MODEL_BRE` does NOT contain `'%_BKH%'` or `'%_BKR%'`.
+2.  **Dimension**: Dealer (`Dealer_Name_Supplier__c`).
+3.  **Filter**: Application count > 30.
+4.  **Additional Metric**: Approval percentage.
+5.  **Date Logic**: The request is about ""no hit percentage"" and ""approval percentage"", which falls under Scenario A (Sourcing). No specific date range is mentioned, so the default ""Last 3 Months"" will be applied using `DATE(LastModifiedDate)`.
+6.  **Column Mapping**:
+    *   Dealer: `Dealer_Name_Supplier__c`
+    *   Banking Hit: `FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%' OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%'`
+    *   Approval Status: `BRE_Sanction_Result__c`
+    *   Date: `LastModifiedDate`
+
+**Steps:**
+1.  Calculate total applications per dealer.
+2.  Calculate applications where banking model had ""no hit"" per dealer.
+3.  Calculate approved applications per dealer.
+4.  Calculate ""no hit percentage"" and ""approval percentage"".
+5.  Filter for dealers with total applications > 30.
+6.  Order by ""no hit percentage"" in descending order and take the top 10.{
+  ""thought_process"": ""The user wants to identify the top 10 dealers with the highest 'no banking hit' percentage, along with their approval percentage. The 'no banking hit' is defined as cases where the FINAL_APPLICANT_SCORECARD_MODEL_BRE does not contain '%_BKH%' or '%_BKR%'. The request implies sourcing data, so 'LastModifiedDate' is used. No specific date range was mentioned, so the default 'Last 3 Months' is applied. A minimum application count of 30 is required for each dealer. The approval status is determined by 'BRE_Sanction_Result__c' being 'ACCEPT' or 'Sanction'."",
+  ""column_mapping"": {
+    ""Dealer Name"": ""Dealer_Name_Supplier__c"",
+    ""Banking Hit Status"": ""FINAL_APPLICANT_SCORECARD_MODEL_BRE"",
+    ""Approval Status"": ""BRE_Sanction_Result__c"",
+    ""Application Date"": ""LastModifiedDate""
+  },
+  ""sql"": ""SELECT\n    Dealer_Name_Supplier__c AS dealer_name,\n    COUNT(*) AS total_applications,\n    COUNT(CASE WHEN NOT (FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%' OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%') THEN 1 END) AS no_banking_hit_count,\n    ROUND(SAFE_DIVIDE(COUNT(CASE WHEN NOT (FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%' OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%') THEN 1 END), COUNT(*)) * 100, 2) AS no_banking_hit_percentage,\n    COUNT(CASE WHEN BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction') THEN 1 END) AS approved_applications,\n    ROUND(SAFE_DIVIDE(COUNT(CASE WHEN BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction') THEN 1 END), COUNT(*)) * 100, 2) AS approval_percentage\nFROM\n    `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`\nWHERE\n    DATE(LastModifiedDate) >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH)\nGROUP BY\n    1\nHAVING\n    total_applications > 30\nORDER BY\n    no_banking_hit_percentage DESC\nLIMIT 10""
+}",No thought process returned.,[],"400 Syntax error: Unexpected identifier ""thought_process"" at [1:1]; reason: invalidQuery, location: query, message: Syntax error: Unexpected identifier ""thought_process"" at [1:1]
+
+Location: US
+Job ID: c22ac5bb-a788-441b-8d46-03b28fa52b63
+"
+97f8f1,3,2025-12-01 21:22:15.606326+00:00,7,What is the rejection based on CIBIL score below 650 in the last 3 months? Month on month?,Sourcing,SOURCING,PASS,"LLM: The candidate data correctly provides the number of rejected applications for each month, matching the values in the reference data. While it omits other metrics like total applications and rejection rate, it directly and accurately answers the user's specific question.",1.1,3244,358,"SELECT
+  DATE_TRUNC(DATE(LastModifiedDate), MONTH) AS month,
+  COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END) AS rejected_applications
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`
+WHERE
+  DATE(LastModifiedDate) >= DATE_SUB(CURRENT_DATE, INTERVAL '3' MONTH)
+  AND SAFE_CAST(CIBIL_SCORE AS INT64) < 650
+GROUP BY
+  1
+ORDER BY
+  1","The user is asking for rejection data, which falls under Scenario A (Sourcing). The date field to use is `LastModifiedDate`, and it needs to be wrapped in `DATE()`. The time window is 'last 3 months', and the output should be 'month on month', so we'll group by month. The filter is 'CIBIL score below 650'. `CIBIL_SCORE` is a STRING and needs to be `SAFE_CAST` to `INT64` for numeric comparison. Rejection is defined by `BRE_Sanction_Result__c IN ('REJECT', 'Reject')`.","['Rejection Status: BRE_Sanction_Result__c', 'CIBIL Score: CIBIL_SCORE', 'Application Date: LastModifiedDate']",
+97f8f1,3,2025-12-01 21:22:27.005335+00:00,8,What is the rejection rate for applications where CIBIL score is between 300-650 in October 2025? Also list out the reason of rejections for these cases.,Sourcing,SOURCING,ERROR,SQL Error: 400 Unrecognized name: REJECTI,0.56,3260,452,"SELECT
+  COUNT(*) AS total_applications,
+  COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END) AS rejected_applications,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END),
+      COUNT(*)
+    ) * 100,
+    2
+  ) AS rejection_rate_pct,
+  ARRAY_AGG(
+    STRUCT(REJECTION_REASON__c, COUNT(1) AS reason_count) IGNORE NULLS ORDER BY COUNT(1) DESC
+    LIMIT 5
+  ) AS top_rejection_reasons
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`
+WHERE
+  DATE(LastModifiedDate) >= '2025-10-01'
+  AND DATE(LastModifiedDate) < '2025-11-01'
+  AND SAFE_CAST(CIBIL_SCORE AS INT64) BETWEEN 300 AND 650","The user is asking for the rejection rate and specific rejection reasons for applications within a defined CIBIL score range and a specific month. This falls under Scenario A (Sourcing, Approvals, Rejections), so `LastModifiedDate` is used for date filtering. The CIBIL score is a STRING and needs `SAFE_CAST` to INT64 for numeric comparison. The query calculates the overall rejection rate and then uses `ARRAY_AGG` to list the top 5 rejection reasons for the rejected applications within the specified criteria.","['CIBIL score: CIBIL_SCORE', 'Rejection Status: BRE_Sanction_Result__c', 'Rejection Reason: REJECTION_REASON__c', 'Application Date: LastModifiedDate']","400 Unrecognized name: REJECTION_REASON__c at [12:12]; reason: invalidQuery, location: query, message: Unrecognized name: REJECTION_REASON__c at [12:12]
+
+Location: asia-south1
+Job ID: bd65252a-d5e5-46db-82a4-55eb1b5af439
+"
+97f8f1,3,2025-12-01 21:22:41.121002+00:00,9,Which state has the highest roll forward rate for the current month in DPD BKT 2?,Collections,COLLECTIONS,PASS,"LLM: The candidate data correctly identifies the state with the highest roll forward rate, and all corresponding values match the reference data exactly.",0.84,0,0,"SELECT
+  STATE,
+  COUNT(DISTINCT CASE WHEN (
+    DPD_BUCKET - SOM_DPD_BUCKET
+  ) > 0 THEN AGREEMENTNO END) AS roll_forward_count,
+  COUNT(DISTINCT AGREEMENTNO) AS total_bucket_2_count,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN (
+        DPD_BUCKET - SOM_DPD_BUCKET
+      ) > 0 THEN AGREEMENTNO END),
+      COUNT(DISTINCT AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS roll_forward_rate
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+WHERE
+  BUSINESS_DATE = (
+    SELECT
+      MAX(BUSINESS_DATE)
+    FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+  )
+  AND SOM_DPD_BUCKET = 2
+  AND NPASTAGEID = 'REGULAR'
+  AND POS > 0
+GROUP BY
+  STATE
+ORDER BY
+  roll_forward_rate DESC
+LIMIT 1","Metric: Roll Forward Rate (DPD_BUCKET > SOM_DPD_BUCKET). Population: SOM_DPD_BUCKET = 2. Scenario 3 (Standard Portfolio Performance) applies, so filter `POS > 0 AND NPASTAGEID = 'REGULAR'`. Time: Current month, so filter `BUSINESS_DATE = (SELECT MAX(BUSINESS_DATE) FROM ...)`. Group by STATE and order by roll forward rate descending to find the highest.","['Roll Forward Rate: DPD_BUCKET, SOM_DPD_BUCKET', 'State: STATE', 'Current Month: BUSINESS_DATE']",
+97f8f1,3,2025-12-01 21:22:57.139475+00:00,10,Analyze the portfolio risk by Ticket Size: Amount Finance and show the 90+ DPD POS % for each? highest first.,Collections,COLLECTIONS,PASS,"LLM: The candidate data correctly identifies the requested dimension (Ticket Size) and metric (90+ DPD POS %), and the values are an exact match to the reference data. The results are also correctly sorted in descending order as requested.",0.76,0,0,"SELECT
+  AMTFIN_BAND,
+  ROUND(SAFE_DIVIDE(SUM(NR_90_PLUS), SUM(POS)) * 100, 2) AS ninety_plus_dpd_pos_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+WHERE
+  BUSINESS_DATE = (
+    SELECT
+      MAX(BUSINESS_DATE)
+    FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+  )
+  AND POS > 0
+GROUP BY
+  1
+ORDER BY
+  ninety_plus_dpd_pos_percentage DESC",Metric: 90+ DPD POS %. User explicitly asks for '90+ DPD'. CRITICAL: I MUST use the pre-calculated column `NR_90_PLUS` (numerator) and `POS` (denominator). I must NOT try to calculate this using DPD_BUCKET filters. Scenario 2 (Risk) applies (filter POS > 0 only). Grouping by 'Ticket Size: Amount Finance' which maps to `AMTFIN_BAND`. Time: Current snapshot (MAX BUSINESS_DATE). Order by percentage highest first.,"['Ticket Size: AMTFIN_BAND', '90+ DPD Risk: NR_90_PLUS / POS']",
+97f8f1,4,2025-12-01 21:23:16.202162+00:00,1,what is the current 0+ performance for dealer categories?,Collections,COLLECTIONS,PASS,"LLM: The candidate data is a perfect match to the reference data. All rows and values are identical, differing only in column order which is acceptable per the evaluation criteria.",0.67,0,0,"SELECT
+  Supplier_Categorization__Credit_Team,
+  COUNT(DISTINCT CASE WHEN DPD > 0 THEN AGREEMENTNO END) AS col_0_plus_dpd_accounts,
+  COUNT(DISTINCT AGREEMENTNO) AS total_accounts,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN DPD > 0 THEN AGREEMENTNO END),
+      COUNT(DISTINCT AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS col_0_plus_dpd_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+WHERE
+  BUSINESS_DATE = (
+    SELECT
+      MAX(BUSINESS_DATE)
+    FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+  )
+  AND POS > 0
+  AND NPASTAGEID = 'REGULAR'
+GROUP BY
+  Supplier_Categorization__Credit_Team
+ORDER BY
+  col_0_plus_dpd_percentage DESC","Metric: 0+ DPD (DPD > 0). Grouping: Dealer Categories (Supplier_Categorization__Credit_Team). Time: Current (MAX BUSINESS_DATE). Scenario 3 (Standard Portfolio Performance) applies, so filter `POS > 0 AND NPASTAGEID = 'REGULAR'`.","['0+ DPD: DPD', 'Dealer Categories: Supplier_Categorization__Credit_Team']",
+97f8f1,4,2025-12-01 21:23:23.457824+00:00,2,what are the last 3 months disbursals where datasutram model score is more than 500?,Sourcing,SOURCING,ERROR,SQL Error: 400 Syntax error: Unclosed str,0.29,3242,388,"SELECT COUNT(*) AS total_disbursals FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25` WHERE DISBURSALDATE >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH) AND DISBURSALDATE IS NOT NULL AND SAFE_CAST(Datasutram_score__c AS INT64) > 500""
+}",No thought process returned.,[],"400 Syntax error: Unclosed string literal at [1:260]; reason: invalidQuery, location: query, message: Syntax error: Unclosed string literal at [1:260]
+
+Location: asia-south1
+Job ID: 3bce9fba-a4e6-428e-b1f9-8752c4771d31
+"
+97f8f1,4,2025-12-01 21:23:33.900667+00:00,3,what is the percentage of disbursed cases for last 3 months month on month out of total disbursed for final_application_scorecard model category BH_BKNH_PH? ,Sourcing,SOURCING,ERROR,SQL Error: 400 Syntax error: Unexpected i,0.35,3254,1906,"thought_process
+The user is asking for the percentage of disbursed cases month-on-month for a specific `FINAL_APPLICANT_SCORECARD_MODEL_BRE` category (`BH_BKNH_PH`).
+This is a disbursal-related metric, so I will use `DISBURSALDATE` and filter for `DISBURSALDATE IS NOT NULL`.
+The time window is ""last 3 months month on month"", which means I need to group by month and filter for the last 3 full months.
+The specific model category is `BH_BKNH_PH`.
+I need to calculate the count of disbursed cases for this category for each month and then divide it by the total disbursed cases for that month (within the specified category) to get the percentage.
+The question asks for ""percentage of disbursed cases for last 3 months month on month out of total disbursed for final_application_scorecard model category BH_BKNH_PH"". This implies:
+1. Filter for `FINAL_APPLICANT_SCORECARD_MODEL_BRE = 'BH_BKNH_PH'`.
+2. Filter for `DISBURSALDATE IS NOT NULL` and within the last 3 months.
+3. Group by month of `DISBURSALDATE`.
+4. Calculate the count of disbursed cases for each month.
+5. The ""out of total disbursed for final_application_scorecard model category BH_BKNH_PH"" part is a bit ambiguous. It could mean:
+    a) Percentage of `BH_BKNH_PH` disbursed cases in a month relative to *all* `BH_BKNH_PH` disbursed cases in the last 3 months.
+    b) Percentage of `BH_BKNH_PH` disbursed cases in a month relative to *all* disbursed cases in that month (regardless of model category).
+
+Given the phrasing ""out of total disbursed for final_application_scorecard model category BH_BKNH_PH"", it sounds like the denominator should be the total disbursed cases *within that specific model category* over the entire 3-month period, and the numerator is the monthly count for that category.
+
+Let's re-read: ""percentage of disbursed cases for last 3 months month on month out of total disbursed for final_application_scorecard model category BH_BKNH_PH"".
+This means:
+- Filter for `FINAL_APPLICANT_SCORECARD_MODEL_BRE = 'BH_BKNH_PH'`.
+- Filter for `DISBURSALDATE IS NOT NULL`.
+- Filter for `DISBURSALDATE` within the last 3 months.
+- Calculate the total count of disbursed cases for `BH_BKNH_PH` in the last 3 months.
+- For each month within the last 3 months, calculate the count of disbursed cases for `BH_BKNH_PH`.
+- Divide the monthly count by the total 3-month count to get the percentage.
+
+Let's define ""last 3 months"" for disbursals. It means `DISBURSALDATE >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH)`.
+However, ""month on month"" usually implies full calendar months. So, it should be `DATE_TRUNC(DISBURSALDATE, MONTH) >= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH), MONTH)`.
+To get the last 3 *full* months, it's better to use `DATE_TRUNC(DISBURSALDATE, MONTH) >= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH), MONTH)` and `DATE_TRUNC(DISBURSALDATE, MONTH) < DATE_TRUNC(CURRENT_DATE(), MONTH)`.
+
+Let's refine the date logic for ""last 3 months month on month"".
+If today is 2023-11-20, ""last 3 months"" would typically mean August, September, October.
+So, `DISBURSALDATE >= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH), MONTH)` and `DISBURSALDATE < DATE_TRUNC(CURRENT_DATE(), MONTH)`.
+
+Steps:
+1. Filter for `DISBURSALDATE IS NOT NULL`.
+2. Filter for `FINAL_APPLICANT_SCORECARD_MODEL_BRE = 'BH_BKNH_PH'`.
+3. Filter for the last 3 full months based on `DISBURSALDATE`.
+4. Calculate the total count of disbursed cases for the specified model and period.
+5. Group by month of `DISBURSALDATE`.
+6. Calculate the count for each month.
+7. Calculate the percentage of each month's count relative to the total count.
+
+Let's consider the date range for ""last 3 months month on month"".
+If `CURRENT_DATE()` is '2023-11-20', then `DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH)` is '2023-08-20'.
+`DATE_TRUNC('2023-08-20', MONTH)` is '2023-08-01'.
+`DATE_TRUNC(CURRENT_DATE(), MONTH)` is '2023-11-01'.
+So the filter `DISBURSALDATE >= '2023-08-01' AND DISBURSALDATE < '2023-11-01'` will cover August, September, October. This seems correct for ""last 3 months month on month"".
+
+The question asks for ""percentage of disbursed cases for last 3 months month on month out of total disbursed for final_application_scorecard model category BH_BKNH_PH"".
+This means:
+- Numerator: Count of disbursed cases for `BH_BKNH_PH` in a specific month.
+- Denominator: Total count of disbursed cases for `BH_BKNH_PH` across the entire 3-month period.
+
+So, I'll calculate the total count first, then monthly counts, and then the percentage.{
+  ""thought_process"": ""The user is asking for the month-on-month percentage of disbursed cases for a specific scorecard model category ('BH_BKNH_PH') over the last 3 full months. This is a disbursal-related metric, so I will use `DISBURSALDATE` and filter for `DISBURSALDATE IS NOT NULL`. The date range will cover the last three complete calendar months. I will first calculate the total disbursed cases for the specified model category within this 3-month period. Then, I will calculate the monthly disbursed cases for the same category and period. Finally, I will compute the percentage of each month's count relative to the total 3-month count."",
+  ""column_mapping"": {
+    ""Disbursed Cases"": ""DISBURSALDATE IS NOT NULL"",
+    ""Scorecard Model Category"": ""FINAL_APPLICANT_SCORECARD_MODEL_BRE"",
+    ""Disbursal Date"": ""DISBURSALDATE""
+  },
+  ""sql"": ""WITH MonthlyDisbursals AS (\n    SELECT\n        DATE_TRUNC(DISBURSALDATE, MONTH) AS disbursal_month,\n        COUNT(*) AS monthly_disbursed_count\n    FROM\n        `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`\n    WHERE\n        DISBURSALDATE IS NOT NULL\n        AND FINAL_APPLICANT_SCORECARD_MODEL_BRE = 'BH_BKNH_PH'\n        AND DATE_TRUNC(DISBURSALDATE, MONTH) >= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH), MONTH)\n        AND DATE_TRUNC(DISBURSALDATE, MONTH) < DATE_TRUNC(CURRENT_DATE(), MONTH)\n    GROUP BY\n        1\n),\nTotalDisbursals AS (\n    SELECT\n        SUM(monthly_disbursed_count) AS total_disbursed_for_category\n    FROM\n        MonthlyDisbursals\n)\nSELECT\n    FORMAT_DATE('%Y-%m', m.disbursal_month) AS disbursal_month,\n    m.monthly_disbursed_count,\n    ROUND(SAFE_DIVIDE(m.monthly_disbursed_count, t.total_disbursed_for_category) * 100, 2) AS percentage_of_total_disbursed\nFROM\n    MonthlyDisbursals m,\n    TotalDisbursals t\nORDER BY\n    m.disbursal_month;""
+}",No thought process returned.,[],"400 Syntax error: Unexpected identifier ""thought_process"" at [1:1]; reason: invalidQuery, location: query, message: Syntax error: Unexpected identifier ""thought_process"" at [1:1]
+
+Location: US
+Job ID: d130b722-0355-4940-9ded-8190dab75a82
+"
+97f8f1,4,2025-12-01 21:23:51.797332+00:00,4,what are the percentage of last 3 months disbursals in S10 category of CRIF Index?,Sourcing,SOURCING,FAIL,LLM: The candidate's calculated percentage of 0 is incorrect. The reference value is 12.77. The difference of 12.77 is well outside the 1% numeric tolerance. [Data_Mismatch],0.97,3240,249,"SELECT
+  ROUND(
+    SAFE_DIVIDE(COUNT(CASE WHEN CRIF_SCORE_BAND = 'S10' THEN 1 END), COUNT(*)) * 100,
+    2
+  ) AS percentage_s10_disbursals
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`
+WHERE
+  DISBURSALDATE >= DATE_SUB(CURRENT_DATE, INTERVAL '3' MONTH)
+  AND NOT DISBURSALDATE IS NULL","Metric: Percentage of disbursals. Scenario B (Disbursals) for date filtering. Date field: DISBURSALDATE, filtered for last 3 months and IS NOT NULL. Dimension: CRIF Index S10 category, using CRIF_SCORE_BAND. Calculate the percentage of S10 disbursals out of total disbursals in the period.","['Disbursal Date: DISBURSALDATE', 'CRIF Index Category: CRIF_SCORE_BAND']",
+97f8f1,4,2025-12-01 21:24:08.113792+00:00,5,What is GNS4 trend for last 4 months?,Collections,COLLECTIONS,PASS,LLM: The candidate data contains all the correct rows from the reference data. The difference in row order is acceptable as the user's question did not specify a particular sort order.,0.72,0,0,"WITH MaxBusinessDate AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_date
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  DATE_TRUNC(t1.BUSINESS_DATE, MONTH) AS month,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN t1.Bounce_Flag = 'Y' THEN t1.AGREEMENTNO END),
+      COUNT(DISTINCT t1.AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS gns4_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t1
+CROSS JOIN MaxBusinessDate AS mbd
+WHERE
+  t1.BUSINESS_DATE >= DATE_SUB(mbd.max_date, INTERVAL '4' MONTH)
+  AND t1.MOB_ON_INSTL_START_DATE = 4
+  AND t1.SOM_NPASTAGEID = 'REGULAR'
+  AND t1.SOM_POS > 0
+GROUP BY
+  1
+ORDER BY
+  1 DESC",Metric: GNS4 Rate (Bounce='Y' at MOB 4). Scenario 1 (Bounce Analysis) applies. Logic: Filter MOB_ON_INSTL_START_DATE = 4 AND Bounce_Flag = 'Y'. Exclusions: SOM_NPASTAGEID = 'REGULAR' and SOM_POS > 0. Time: Last 4 months relative to MAX date. The trend implies grouping by month.,"['GNS4: Bounce_Flag, MOB_ON_INSTL_START_DATE', 'Time: BUSINESS_DATE']",
+97f8f1,4,2025-12-01 21:24:14.995383+00:00,6,Show me the top 10 dealers where banking model has highest no hit percentage? application count should be greater than 30 and what is the approval percentage?,Sourcing,SOURCING,ERROR,SQL Error: 400 Syntax error: Unexpected i,0.34,3251,975,"thought_process
+The user is asking for the top 10 dealers based on the ""no hit percentage"" of the banking model, with a minimum application count of 30. Additionally, they want the approval percentage for these dealers.
+
+1.  **Metric**: ""No hit percentage"" for banking model. This means applications where `FINAL_APPLICANT_SCORECARD_MODEL_BRE` does NOT contain `'%_BKH%'` or `'%_BKR%'`.
+2.  **Dimension**: Dealer (`Dealer_Name_Supplier__c`).
+3.  **Filter**: Application count > 30.
+4.  **Additional Metric**: Approval percentage.
+5.  **Date Logic**: The request is about ""no hit percentage"" and ""approval percentage"", which falls under Scenario A (Sourcing). No specific date range is mentioned, so the default ""Last 3 Months"" will be applied using `DATE(LastModifiedDate)`.
+6.  **Column Mapping**:
+    *   Dealer: `Dealer_Name_Supplier__c`
+    *   Banking Hit: `FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%' OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%'`
+    *   Approval Status: `BRE_Sanction_Result__c`
+    *   Date: `LastModifiedDate`
+
+**Steps:**
+1.  Calculate total applications per dealer.
+2.  Calculate applications where banking model had ""no hit"" per dealer.
+3.  Calculate approved applications per dealer.
+4.  Calculate ""no hit percentage"" and ""approval percentage"".
+5.  Filter for dealers with total applications > 30.
+6.  Order by ""no hit percentage"" in descending order and take the top 10.{
+  ""thought_process"": ""The user wants to identify the top 10 dealers with the highest 'no banking hit' percentage, along with their approval percentage. The 'no banking hit' is defined as cases where the FINAL_APPLICANT_SCORECARD_MODEL_BRE does not contain '%_BKH%' or '%_BKR%'. The request implies sourcing data, so 'LastModifiedDate' is used. No specific date range was mentioned, so the default 'Last 3 Months' is applied. A minimum application count of 30 is required for each dealer. The approval status is determined by 'BRE_Sanction_Result__c' being 'ACCEPT' or 'Sanction'."",
+  ""column_mapping"": {
+    ""Dealer Name"": ""Dealer_Name_Supplier__c"",
+    ""Banking Hit Status"": ""FINAL_APPLICANT_SCORECARD_MODEL_BRE"",
+    ""Approval Status"": ""BRE_Sanction_Result__c"",
+    ""Application Date"": ""LastModifiedDate""
+  },
+  ""sql"": ""SELECT\n    Dealer_Name_Supplier__c AS dealer_name,\n    COUNT(*) AS total_applications,\n    COUNT(CASE WHEN NOT (FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%' OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%') THEN 1 END) AS no_banking_hit_count,\n    ROUND(SAFE_DIVIDE(COUNT(CASE WHEN NOT (FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%' OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%') THEN 1 END), COUNT(*)) * 100, 2) AS no_banking_hit_percentage,\n    COUNT(CASE WHEN BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction') THEN 1 END) AS approved_applications,\n    ROUND(SAFE_DIVIDE(COUNT(CASE WHEN BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction') THEN 1 END), COUNT(*)) * 100, 2) AS approval_percentage\nFROM\n    `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`\nWHERE\n    DATE(LastModifiedDate) >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH)\nGROUP BY\n    1\nHAVING\n    total_applications > 30\nORDER BY\n    no_banking_hit_percentage DESC\nLIMIT 10""
+}",No thought process returned.,[],"400 Syntax error: Unexpected identifier ""thought_process"" at [1:1]; reason: invalidQuery, location: query, message: Syntax error: Unexpected identifier ""thought_process"" at [1:1]
+
+Location: US
+Job ID: ece65af9-e868-420a-b576-69caab8007c0
+"
+97f8f1,4,2025-12-01 21:24:34.355912+00:00,7,What is the rejection based on CIBIL score below 650 in the last 3 months? Month on month?,Sourcing,SOURCING,PASS,"LLM: The candidate data correctly provides the number of rejected applications for each month, matching the values in the reference data. While it omits other metrics like total applications and rejection rate, it directly and accurately answers the user's specific question.",1.16,3244,317,"SELECT
+  DATE_TRUNC(DATE(LastModifiedDate), MONTH) AS month,
+  COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END) AS rejected_applications
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`
+WHERE
+  DATE(LastModifiedDate) >= DATE_SUB(CURRENT_DATE, INTERVAL '3' MONTH)
+  AND SAFE_CAST(CIBIL_SCORE AS INT64) < 650
+GROUP BY
+  1
+ORDER BY
+  1","Metric: Rejection count. Dimension: Month-on-month. Filter: CIBIL score below 650. Scenario A (Sourcing) applies, so using `LastModifiedDate` and filtering for the last 3 months. `CIBIL_SCORE` is a STRING and needs `SAFE_CAST` to `INT64` for numeric comparison. Rejection is defined by `BRE_Sanction_Result__c`.","['Rejection Status: BRE_Sanction_Result__c', 'CIBIL Score: CIBIL_SCORE', 'Application Date: LastModifiedDate']",
+97f8f1,4,2025-12-01 21:24:40.525785+00:00,8,What is the rejection rate for applications where CIBIL score is between 300-650 in October 2025? Also list out the reason of rejections for these cases.,Sourcing,SOURCING,ERROR,SQL Error: 400 Syntax error: Unexpected i,0.36,3260,797,"thought_process
+The user is asking for the rejection rate and reasons for applications with a specific CIBIL score range in a given month.
+This falls under Scenario A (Sourcing, Approvals, Rejections, Volume) for date logic, so `LastModifiedDate` will be used.
+The CIBIL score range is 300-650, which maps to `CIBIL_SCORE`. This column is a STRING, so it needs `SAFE_CAST` to `INT64` for numeric comparison.
+Rejection status is defined by `BRE_Sanction_Result__c IN ('REJECT', 'Reject')`.
+The rejection reason is not explicitly available as a single column in the provided schema. I will assume the user is asking for the `SCORECARD_MODEL_DESCRIPTION_BRE__c` or similar descriptive field that might contain rejection reasons. Given the schema, `SCORECARD_MODEL_DESCRIPTION_BRE__c` seems like the most appropriate field for ""reason of rejections"".
+
+Steps:
+1.  Filter by `LastModifiedDate` for October 2025.
+2.  Filter by `CIBIL_SCORE` between 300 and 650 (inclusive), casting `CIBIL_SCORE` to `INT64`.
+3.  Calculate the total number of applications in this segment.
+4.  Calculate the number of rejected applications in this segment.
+5.  Calculate the rejection rate.
+6.  Group by `SCORECARD_MODEL_DESCRIPTION_BRE__c` to list rejection reasons for these cases.{
+  ""thought_process"": ""Metric: Rejection Rate and Reasons. Scenario A (Sourcing) for date logic, using `LastModifiedDate`. Date filter for October 2025. Filter by CIBIL score range (300-650), requiring `SAFE_CAST` for `CIBIL_SCORE`. Rejection status is defined by `BRE_Sanction_Result__c`. The 'reason of rejections' is mapped to `SCORECARD_MODEL_DESCRIPTION_BRE__c` as it's the most relevant descriptive field in the schema for such information."",
+  ""column_mapping"": {
+    ""CIBIL Score"": ""CIBIL_SCORE"",
+    ""Rejection Status"": ""BRE_Sanction_Result__c"",
+    ""Rejection Reason"": ""SCORECARD_MODEL_DESCRIPTION_BRE__c"",
+    ""Application Date"": ""LastModifiedDate""
+  },
+  ""sql"": ""SELECT\n    SCORECARD_MODEL_DESCRIPTION_BRE__c AS rejection_reason,\n    COUNT(*) AS total_applications_in_segment,\n    COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END) AS rejected_applications,\n    ROUND(SAFE_DIVIDE(COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END), COUNT(*)) * 100, 2) AS rejection_rate_pct\nFROM\n    `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`\nWHERE\n    DATE(LastModifiedDate) >= '2025-10-01'\n    AND DATE(LastModifiedDate) < '2025-11-01'\n    AND SAFE_CAST(CIBIL_SCORE AS INT64) BETWEEN 300 AND 650\nGROUP BY\n    rejection_reason\nORDER BY\n    rejected_applications DESC;""
+}",No thought process returned.,[],"400 Syntax error: Unexpected identifier ""thought_process"" at [1:1]; reason: invalidQuery, location: query, message: Syntax error: Unexpected identifier ""thought_process"" at [1:1]
+
+Location: US
+Job ID: abe38e72-5beb-40fe-9cea-b7d517bc419f
+"
+97f8f1,4,2025-12-01 21:24:54.930298+00:00,9,Which state has the highest roll forward rate for the current month in DPD BKT 2?,Collections,COLLECTIONS,PASS,"LLM: The candidate data correctly identifies the state with the highest roll forward rate, and all corresponding values for roll count, total accounts, and the rate itself are identical to the reference data.",0.72,0,0,"SELECT
+  STATE,
+  COUNT(DISTINCT CASE WHEN (
+    DPD_BUCKET - SOM_DPD_BUCKET
+  ) > 0 THEN AGREEMENTNO END) AS roll_forward_count,
+  COUNT(DISTINCT AGREEMENTNO) AS total_bucket_2_count,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN (
+        DPD_BUCKET - SOM_DPD_BUCKET
+      ) > 0 THEN AGREEMENTNO END),
+      COUNT(DISTINCT AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS roll_forward_rate
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+WHERE
+  BUSINESS_DATE = (
+    SELECT
+      MAX(BUSINESS_DATE)
+    FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+  )
+  AND SOM_DPD_BUCKET = 2
+  AND NPASTAGEID = 'REGULAR'
+  AND POS > 0
+GROUP BY
+  STATE
+ORDER BY
+  roll_forward_rate DESC
+LIMIT 1","Metric: Roll Forward Rate (DPD_BUCKET > SOM_DPD_BUCKET). Population: SOM_DPD_BUCKET = 2. Scenario 3 (Standard Portfolio Performance) applies, so filter `POS > 0 AND NPASTAGEID = 'REGULAR'`. Time: Current month, so filter `BUSINESS_DATE = (SELECT MAX(BUSINESS_DATE) FROM ...)`. Group by STATE and order by roll forward rate descending to find the highest.","['Roll Forward Rate: DPD_BUCKET, SOM_DPD_BUCKET', 'State: STATE', 'Current Month: BUSINESS_DATE']",
+97f8f1,4,2025-12-01 21:25:11.004839+00:00,10,Analyze the portfolio risk by Ticket Size: Amount Finance and show the 90+ DPD POS % for each? highest first.,Collections,COLLECTIONS,PASS,LLM: The candidate data correctly identifies the ticket size bands and their corresponding 90+ DPD POS percentages. The data is accurately sorted from highest to lowest risk as requested.,0.73,0,0,"SELECT
+  AMTFIN_BAND,
+  ROUND(SAFE_DIVIDE(SUM(NR_90_PLUS), SUM(POS)) * 100, 2) AS ninety_plus_dpd_pos_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+WHERE
+  BUSINESS_DATE = (
+    SELECT
+      MAX(BUSINESS_DATE)
+    FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+  )
+  AND POS > 0
+GROUP BY
+  1
+ORDER BY
+  ninety_plus_dpd_pos_percentage DESC",Metric: 90+ DPD POS %. User explicitly asks for '90+ DPD'. CRITICAL: I MUST use the pre-calculated column `NR_90_PLUS` (numerator) and `POS` (denominator). I must NOT try to calculate this using DPD_BUCKET filters. Grouping: 'Ticket Size: Amount Finance' maps to `AMTFIN_BAND`. Scenario 2 (Risk) applies (filter POS > 0 only). Time: Current snapshot (MAX BUSINESS_DATE). Ordering: Highest first.,"['Ticket Size: AMTFIN_BAND', '90+ DPD Risk: NR_90_PLUS / POS']",
+97f8f1,5,2025-12-01 21:25:29.284700+00:00,1,what is the current 0+ performance for dealer categories?,Collections,COLLECTIONS,PASS,LLM: The candidate data is a perfect match to the reference data. All rows and corresponding values are identical. The difference in column order is ignored as per the evaluation criteria.,0.68,0,0,"SELECT
+  Supplier_Categorization__Credit_Team,
+  COUNT(DISTINCT CASE WHEN DPD > 0 THEN AGREEMENTNO END) AS col_0_plus_dpd_accounts,
+  COUNT(DISTINCT AGREEMENTNO) AS total_accounts,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN DPD > 0 THEN AGREEMENTNO END),
+      COUNT(DISTINCT AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS col_0_plus_dpd_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+WHERE
+  BUSINESS_DATE = (
+    SELECT
+      MAX(BUSINESS_DATE)
+    FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+  )
+  AND POS > 0
+  AND NPASTAGEID = 'REGULAR'
+GROUP BY
+  Supplier_Categorization__Credit_Team
+ORDER BY
+  col_0_plus_dpd_percentage DESC","Metric: 0+ DPD (DPD > 0). Grouping: Dealer Categories (Supplier_Categorization__Credit_Team). Time: Current (MAX BUSINESS_DATE). Scenario 3 (Standard Portfolio Performance) applies, so filter: POS > 0 AND NPASTAGEID = 'REGULAR'.","['0+ Performance: DPD', 'Dealer Categories: Supplier_Categorization__Credit_Team']",
+97f8f1,5,2025-12-01 21:25:54.909245+00:00,2,what are the last 3 months disbursals where datasutram model score is more than 500?,Sourcing,COLLECTIONS,SKIP,Ref Broken,0.02,0,0,"WITH DateAnchor AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_business_date
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  COUNT(DISTINCT t1.AGREEMENTNO) AS disbursals_count
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t1
+CROSS JOIN DateAnchor AS da
+WHERE
+  t1.DISBURSALDATE >= DATE_SUB(da.max_business_date, INTERVAL '3' MONTH)
+  AND t1.DISBURSALDATE <= da.max_business_date
+  AND t1.EWS_Model_Score > 500","The user is asking for a count of 'disbursals' (unique agreements) within a specific time frame ('last 3 months') and with a condition on 'datasutram model score'. This is a vintage-like analysis, so according to the CRITICAL RULE for Vintage Analysis, I must filter by `DISBURSALDATE` range and NOT by `BUSINESS_DATE`. The 'last 3 months' for `DISBURSALDATE` will be relative to the `MAX(BUSINESS_DATE)` in the table. The `EWS_Model_Score` filter is applied directly. No specific 3-way switch scenario applies as this is about the initial cohort of disbursed loans, not current portfolio performance, bounce, or write-off status.","['Disbursals: AGREEMENTNO', 'Disbursal Date: DISBURSALDATE', 'Datasutram Model Score: EWS_Model_Score']","string indices must be integers, not 'str'"
+97f8f1,5,2025-12-01 21:25:59.444567+00:00,3,what is the percentage of disbursed cases for last 3 months month on month out of total disbursed for final_application_scorecard model category BH_BKNH_PH? ,Sourcing,SOURCING,SKIP,Ref Broken,0.02,3254,696,"thought_process
+The user is asking for the percentage of disbursed cases month-on-month for a specific `FINAL_APPLICANT_SCORECARD_MODEL_BRE` category (`BH_BKNH_PH`).
+This is a disbursal-related metric, so I will use `DISBURSALDATE` and filter for `DISBURSALDATE IS NOT NULL`.
+The time window is ""last 3 months month on month"", which means I need to group by month and filter for the last 3 full months.
+The specific model category is `BH_BKNH_PH`.
+
+Steps:
+1.  Filter for disbursed cases (`DISBURSALDATE IS NOT NULL`).
+2.  Filter for the last 3 months based on `DISBURSALDATE`.
+3.  Filter for `FINAL_APPLICANT_SCORECARD_MODEL_BRE = 'BH_BKNH_PH'`.
+4.  Calculate the count of disbursed cases for the specified model category per month.
+5.  Calculate the total disbursed cases per month.
+6.  Calculate the percentage of the specified model category out of the total disbursed cases for each month.
+7.  Order by month.{
+  ""thought_process"": ""Metric: Percentage of disbursed cases for a specific scorecard model category ('BH_BKNH_PH') out of total disbursed cases, month-on-month. Scenario B (Disbursal) is applicable, so using `DISBURSALDATE` and filtering for `DISBURSALDATE IS NOT NULL`. The time window is 'last 3 months month on month', meaning we need to group by month and filter for the last 3 full months."",
+  ""column_mapping"": {
+    ""Disbursed Cases"": ""DISBURSALDATE IS NOT NULL"",
+    ""Final Applicant Scorecard Model Category"": ""FINAL_APPLICANT_SCORECARD_MODEL_BRE"",
+    ""Disbursal Date"": ""DISBURSALDATE""
+  },
+  ""sql"": ""SELECT\n    DATE_TRUNC(DISBURSALDATE, MONTH) AS disbursal_month,\n    COUNT(CASE WHEN FINAL_APPLICANT_SCORECARD_MODEL_BRE = 'BH_BKNH_PH' THEN 1 END) AS bh_bknh_ph_disbursed_count,\n    COUNT(*) AS total_disbursed_count,\n    ROUND(SAFE_DIVIDE(\n        COUNT(CASE WHEN FINAL_APPLICANT_SCORECARD_MODEL_BRE = 'BH_BKNH_PH' THEN 1 END),\n        COUNT(*)\n    ) * 100, 2) AS percentage_bh_bknh_ph\nFROM\n    `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`\nWHERE\n    DISBURSALDATE IS NOT NULL\n    AND DISBURSALDATE >= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH), MONTH)\n    AND DISBURSALDATE < DATE_TRUNC(CURRENT_DATE(), MONTH)\nGROUP BY\n    disbursal_month\nORDER BY\n    disbursal_month;""
+}",No thought process returned.,[],"string indices must be integers, not 'str'"
+97f8f1,5,2025-12-01 21:26:03.714352+00:00,4,what are the percentage of last 3 months disbursals in S10 category of CRIF Index?,Sourcing,SOURCING,SKIP,Ref Broken,0.02,3240,258,"SELECT
+  ROUND(
+    SAFE_DIVIDE(COUNT(CASE WHEN CRIF_SCORE_BAND = 'S10' THEN 1 END), COUNT(*)) * 100,
+    2
+  ) AS percentage_disbursals_in_s10
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`
+WHERE
+  DISBURSALDATE >= DATE_SUB(CURRENT_DATE, INTERVAL '3' MONTH)
+  AND NOT DISBURSALDATE IS NULL","Metric: Percentage of disbursals in a specific CRIF score band. Scenario B (Disbursals) is triggered by 'disbursals'. Date field: DISBURSALDATE, filtered for NOT NULL and last 3 months. Dimension: CRIF_SCORE_BAND. Calculation involves counting disbursals within the 'S10' band and dividing by total disbursals for the period.","['Disbursal Date: DISBURSALDATE', 'CRIF Score Band: CRIF_SCORE_BAND']","string indices must be integers, not 'str'"
+97f8f1,5,2025-12-01 21:26:09.024683+00:00,5,What is GNS4 trend for last 4 months?,Collections,COLLECTIONS,SKIP,Ref Broken,0.02,0,0,"WITH max_business_date AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_date
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  DATE_TRUNC(t1.BUSINESS_DATE, MONTH) AS month,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN t1.Bounce_Flag = 'Y' THEN t1.AGREEMENTNO END),
+      COUNT(DISTINCT t1.AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS gns4_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t1
+CROSS JOIN max_business_date AS t2
+WHERE
+  t1.BUSINESS_DATE >= DATE_SUB(t2.max_date, INTERVAL '4' MONTH)
+  AND t1.MOB_ON_INSTL_START_DATE = 4
+  AND t1.SOM_NPASTAGEID = 'REGULAR'
+  AND t1.SOM_POS > 0
+GROUP BY
+  1
+ORDER BY
+  1 DESC",Metric: GNS4 Rate (Bounce='Y' at MOB 4). Scenario 1 (Bounce Analysis) applies. Logic: Filter MOB_ON_INSTL_START_DATE = 4 AND Bounce_Flag = 'Y'. Exclusions: SOM_NPASTAGEID = 'REGULAR' and SOM_POS > 0. Time: Last 4 months relative to MAX date.,"['GNS4: Bounce_Flag, MOB_ON_INSTL_START_DATE', 'Time: BUSINESS_DATE']","string indices must be integers, not 'str'"
+97f8f1,5,2025-12-01 21:26:15.271502+00:00,6,Show me the top 10 dealers where banking model has highest no hit percentage? application count should be greater than 30 and what is the approval percentage?,Sourcing,SOURCING,SKIP,Ref Broken,0.02,3251,975,"thought_process
+The user is asking for the top 10 dealers based on the ""no hit percentage"" of the banking model, with a minimum application count of 30. Additionally, they want the approval percentage for these dealers.
+
+1.  **Metric**: ""No hit percentage"" for banking model. This means applications where `FINAL_APPLICANT_SCORECARD_MODEL_BRE` does NOT contain `'%_BKH%'` or `'%_BKR%'`.
+2.  **Dimension**: Dealer (`Dealer_Name_Supplier__c`).
+3.  **Filter**: Application count > 30.
+4.  **Additional Metric**: Approval percentage.
+5.  **Date Logic**: The request is about ""no hit percentage"" and ""approval percentage"", which falls under Scenario A (Sourcing). No specific date range is mentioned, so the default ""Last 3 Months"" will be applied using `DATE(LastModifiedDate)`.
+6.  **Column Mapping**:
+    *   Dealer: `Dealer_Name_Supplier__c`
+    *   Banking Hit: `FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%' OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%'`
+    *   Approval Status: `BRE_Sanction_Result__c`
+    *   Date: `LastModifiedDate`
+
+**Steps:**
+1.  Calculate total applications per dealer.
+2.  Calculate applications where banking model had ""no hit"" per dealer.
+3.  Calculate approved applications per dealer.
+4.  Calculate ""no hit percentage"" and ""approval percentage"".
+5.  Filter for dealers with total applications > 30.
+6.  Order by ""no hit percentage"" in descending order and take the top 10.{
+  ""thought_process"": ""The user wants to identify the top 10 dealers with the highest 'no banking hit' percentage, along with their approval percentage. The 'no banking hit' is defined as cases where the FINAL_APPLICANT_SCORECARD_MODEL_BRE does not contain '%_BKH%' or '%_BKR%'. The request implies sourcing data, so 'LastModifiedDate' is used. No specific date range was mentioned, so the default 'Last 3 Months' is applied. A minimum application count of 30 is required for each dealer. The approval status is determined by 'BRE_Sanction_Result__c' being 'ACCEPT' or 'Sanction'."",
+  ""column_mapping"": {
+    ""Dealer Name"": ""Dealer_Name_Supplier__c"",
+    ""Banking Hit Status"": ""FINAL_APPLICANT_SCORECARD_MODEL_BRE"",
+    ""Approval Status"": ""BRE_Sanction_Result__c"",
+    ""Application Date"": ""LastModifiedDate""
+  },
+  ""sql"": ""SELECT\n    Dealer_Name_Supplier__c AS dealer_name,\n    COUNT(*) AS total_applications,\n    COUNT(CASE WHEN NOT (FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%' OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%') THEN 1 END) AS no_banking_hit_count,\n    ROUND(SAFE_DIVIDE(COUNT(CASE WHEN NOT (FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%' OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%') THEN 1 END), COUNT(*)) * 100, 2) AS no_banking_hit_percentage,\n    COUNT(CASE WHEN BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction') THEN 1 END) AS approved_applications,\n    ROUND(SAFE_DIVIDE(COUNT(CASE WHEN BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction') THEN 1 END), COUNT(*)) * 100, 2) AS approval_percentage\nFROM\n    `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`\nWHERE\n    DATE(LastModifiedDate) >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH)\nGROUP BY\n    1\nHAVING\n    total_applications > 30\nORDER BY\n    no_banking_hit_percentage DESC\nLIMIT 10""
+}",No thought process returned.,[],"string indices must be integers, not 'str'"
+97f8f1,5,2025-12-01 21:26:22.249924+00:00,7,What is the rejection based on CIBIL score below 650 in the last 3 months? Month on month?,Sourcing,COLLECTIONS,SKIP,Ref Broken,0.0,0,0,,,[],No SQL Generated
+97f8f1,5,2025-12-01 21:26:30.639377+00:00,8,What is the rejection rate for applications where CIBIL score is between 300-650 in October 2025? Also list out the reason of rejections for these cases.,Sourcing,SOURCING,SKIP,Ref Broken,0.02,3260,452,"SELECT
+  COUNT(*) AS total_applications,
+  COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END) AS rejected_applications,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END),
+      COUNT(*)
+    ) * 100,
+    2
+  ) AS rejection_rate_pct,
+  ARRAY_AGG(
+    STRUCT(REJECTION_REASON__c, COUNT(1) AS reason_count) IGNORE NULLS ORDER BY COUNT(1) DESC
+    LIMIT 5
+  ) AS top_rejection_reasons
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`
+WHERE
+  DATE(LastModifiedDate) >= '2025-10-01'
+  AND DATE(LastModifiedDate) < '2025-11-01'
+  AND SAFE_CAST(CIBIL_SCORE AS INT64) BETWEEN 300 AND 650","The user is asking for the rejection rate and specific rejection reasons for applications within a defined CIBIL score range and a specific month. This falls under Scenario A (Sourcing, Approvals, Rejections), so `LastModifiedDate` is used for date filtering. The CIBIL score is a STRING and needs `SAFE_CAST` to INT64 for numeric comparison. The query calculates the overall rejection rate and then uses `ARRAY_AGG` to list the top 5 rejection reasons for the rejected applications within the specified criteria.","['CIBIL score: CIBIL_SCORE', 'Rejection Status: BRE_Sanction_Result__c', 'Rejection Reason: REJECTION_REASON__c', 'Application Date: LastModifiedDate']","string indices must be integers, not 'str'"
+97f8f1,5,2025-12-01 21:26:35.622283+00:00,9,Which state has the highest roll forward rate for the current month in DPD BKT 2?,Collections,COLLECTIONS,SKIP,Ref Broken,0.03,0,0,"SELECT
+  STATE,
+  COUNT(DISTINCT CASE WHEN DPD_BUCKET > SOM_DPD_BUCKET THEN AGREEMENTNO END) AS roll_forward_count,
+  COUNT(DISTINCT AGREEMENTNO) AS total_bucket_2_accounts,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN DPD_BUCKET > SOM_DPD_BUCKET THEN AGREEMENTNO END),
+      COUNT(DISTINCT AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS roll_forward_rate
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+WHERE
+  BUSINESS_DATE = (
+    SELECT
+      MAX(BUSINESS_DATE)
+    FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+  )
+  AND SOM_DPD_BUCKET = 2
+  AND POS > 0
+  AND NPASTAGEID = 'REGULAR'
+GROUP BY
+  STATE
+ORDER BY
+  roll_forward_rate DESC
+LIMIT 1","Metric: Roll Forward Rate (DPD_BUCKET > SOM_DPD_BUCKET). Population: SOM_DPD_BUCKET = 2. Scenario 3 (Standard Portfolio Performance) applies, so filter by POS > 0 AND NPASTAGEID = 'REGULAR'. Time: Current month, so filter by BUSINESS_DATE = MAX(BUSINESS_DATE). Group by STATE and order by roll forward rate descending to find the highest.","['Roll Forward Rate: DPD_BUCKET, SOM_DPD_BUCKET', 'DPD Bucket: SOM_DPD_BUCKET', 'State: STATE', 'Current Month: BUSINESS_DATE']","string indices must be integers, not 'str'"
+97f8f1,5,2025-12-01 21:26:40.587710+00:00,10,Analyze the portfolio risk by Ticket Size: Amount Finance and show the 90+ DPD POS % for each? highest first.,Collections,COLLECTIONS,SKIP,Ref Broken,0.02,0,0,"SELECT
+  AMTFIN_BAND,
+  ROUND(SAFE_DIVIDE(SUM(NR_90_PLUS), SUM(POS)) * 100, 2) AS ninety_plus_dpd_pos_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+WHERE
+  BUSINESS_DATE = (
+    SELECT
+      MAX(BUSINESS_DATE)
+    FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+  )
+  AND POS > 0
+GROUP BY
+  1
+ORDER BY
+  ninety_plus_dpd_pos_percentage DESC",Metric: 90+ DPD POS %. User explicitly asks for '90+ DPD'. CRITICAL: I MUST use the pre-calculated column `NR_90_PLUS` (numerator) and `POS` (denominator). I must NOT try to calculate this using DPD_BUCKET filters. Scenario 2 (Risk) applies (filter POS > 0 only). Grouping by 'Ticket Size: Amount Finance' which maps to `AMTFIN_BAND`. Time: Current snapshot (MAX BUSINESS_DATE). Order by percentage highest first.,"['Ticket Size: AMTFIN_BAND', '90+ DPD Risk: NR_90_PLUS / POS']","string indices must be integers, not 'str'"
+97f8f1,6,2025-12-01 21:26:44.552365+00:00,1,what is the current 0+ performance for dealer categories?,Collections,COLLECTIONS,SKIP,Ref Broken,0.02,0,0,"SELECT
+  Supplier_Categorization__Credit_Team,
+  COUNT(DISTINCT CASE WHEN DPD > 0 THEN AGREEMENTNO END) AS col_0_plus_dpd_accounts,
+  COUNT(DISTINCT AGREEMENTNO) AS total_accounts,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN DPD > 0 THEN AGREEMENTNO END),
+      COUNT(DISTINCT AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS col_0_plus_dpd_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+WHERE
+  BUSINESS_DATE = (
+    SELECT
+      MAX(BUSINESS_DATE)
+    FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+  )
+  AND POS > 0
+  AND NPASTAGEID = 'REGULAR'
+GROUP BY
+  Supplier_Categorization__Credit_Team
+ORDER BY
+  col_0_plus_dpd_percentage DESC","Metric: 0+ DPD (DPD > 0). Grouping: Dealer Categories (Supplier_Categorization__Credit_Team). Time: Current (MAX BUSINESS_DATE). Scenario 3 (Standard Portfolio Performance) applies, so filter: POS > 0 AND NPASTAGEID = 'REGULAR'.","['0+ Performance: DPD', 'Dealer Categories: Supplier_Categorization__Credit_Team']","string indices must be integers, not 'str'"
+97f8f1,6,2025-12-01 21:27:00.166494+00:00,2,what are the last 3 months disbursals where datasutram model score is more than 500?,Sourcing,COLLECTIONS,SKIP,Ref Broken,0.02,0,0,"WITH MaxBusinessDate AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_date
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  COUNT(DISTINCT t1.AGREEMENTNO) AS disbursals_count
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t1
+CROSS JOIN MaxBusinessDate AS mbd
+WHERE
+  t1.BUSINESS_DATE = mbd.max_date
+  AND t1.DISBURSALDATE >= DATE_SUB(mbd.max_date, INTERVAL '3' MONTH)
+  AND t1.EWS_Model_Score > 500
+  AND t1.POS > 0","The user is asking for a count of disbursals (AGREEMENTNO) that meet two criteria: 1) disbursed in the last 3 months, and 2) have an EWS_Model_Score greater than 500. Since EWS_Model_Score is a risk indicator, Scenario 2 (Risk Analysis) applies, meaning the filter `POS > 0` should be used. The 'last 3 months' refers to the DISBURSALDATE, and the EWS_Model_Score should be taken from the latest available BUSINESS_DATE snapshot for those agreements.","['Disbursals: AGREEMENTNO, DISBURSALDATE', 'Datasutram Model Score: EWS_Model_Score']","string indices must be integers, not 'str'"
+97f8f1,6,2025-12-01 21:27:04.625416+00:00,3,what is the percentage of disbursed cases for last 3 months month on month out of total disbursed for final_application_scorecard model category BH_BKNH_PH? ,Sourcing,SOURCING,SKIP,Ref Broken,0.02,3254,696,"thought_process
+The user is asking for the percentage of disbursed cases month-on-month for a specific `FINAL_APPLICANT_SCORECARD_MODEL_BRE` category (`BH_BKNH_PH`).
+This is a disbursal-related metric, so I will use `DISBURSALDATE` and filter for `DISBURSALDATE IS NOT NULL`.
+The time window is ""last 3 months month on month"", which means I need to group by month and filter for the last 3 full months.
+The specific model category is `BH_BKNH_PH`.
+
+Steps:
+1.  Filter for disbursed cases (`DISBURSALDATE IS NOT NULL`).
+2.  Filter for the last 3 months based on `DISBURSALDATE`.
+3.  Filter for `FINAL_APPLICANT_SCORECARD_MODEL_BRE = 'BH_BKNH_PH'`.
+4.  Calculate the count of disbursed cases for the specified model category per month.
+5.  Calculate the total disbursed cases per month.
+6.  Calculate the percentage of the specified model category out of the total disbursed cases for each month.
+7.  Order by month.{
+  ""thought_process"": ""Metric: Percentage of disbursed cases for a specific scorecard model category ('BH_BKNH_PH') out of total disbursed cases, month-on-month. Scenario B (Disbursal) is applicable, so using `DISBURSALDATE` and filtering for `DISBURSALDATE IS NOT NULL`. The time window is 'last 3 months month on month', meaning we need to group by month and filter for the last 3 full months."",
+  ""column_mapping"": {
+    ""Disbursed Cases"": ""DISBURSALDATE IS NOT NULL"",
+    ""Final Applicant Scorecard Model Category"": ""FINAL_APPLICANT_SCORECARD_MODEL_BRE"",
+    ""Disbursal Date"": ""DISBURSALDATE""
+  },
+  ""sql"": ""SELECT\n    DATE_TRUNC(DISBURSALDATE, MONTH) AS disbursal_month,\n    COUNT(CASE WHEN FINAL_APPLICANT_SCORECARD_MODEL_BRE = 'BH_BKNH_PH' THEN 1 END) AS bh_bknh_ph_disbursed_count,\n    COUNT(*) AS total_disbursed_count,\n    ROUND(SAFE_DIVIDE(\n        COUNT(CASE WHEN FINAL_APPLICANT_SCORECARD_MODEL_BRE = 'BH_BKNH_PH' THEN 1 END),\n        COUNT(*)\n    ) * 100, 2) AS percentage_bh_bknh_ph\nFROM\n    `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`\nWHERE\n    DISBURSALDATE IS NOT NULL\n    AND DISBURSALDATE >= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH), MONTH)\n    AND DISBURSALDATE < DATE_TRUNC(CURRENT_DATE(), MONTH)\nGROUP BY\n    disbursal_month\nORDER BY\n    disbursal_month;""
+}",No thought process returned.,[],"string indices must be integers, not 'str'"
+97f8f1,6,2025-12-01 21:27:08.951036+00:00,4,what are the percentage of last 3 months disbursals in S10 category of CRIF Index?,Sourcing,SOURCING,SKIP,Ref Broken,0.02,3240,249,"SELECT
+  ROUND(
+    SAFE_DIVIDE(COUNT(CASE WHEN CRIF_SCORE_BAND = 'S10' THEN 1 END), COUNT(*)) * 100,
+    2
+  ) AS percentage_s10_disbursals
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`
+WHERE
+  DISBURSALDATE >= DATE_SUB(CURRENT_DATE, INTERVAL '3' MONTH)
+  AND NOT DISBURSALDATE IS NULL","Metric: Percentage of disbursals. Scenario B (Disbursals) for date filtering. Date field: DISBURSALDATE, filtered for last 3 months and IS NOT NULL. Dimension: CRIF Index S10 category, using CRIF_SCORE_BAND. Calculate the percentage of S10 disbursals out of total disbursals in the period.","['Disbursal Date: DISBURSALDATE', 'CRIF Index Category: CRIF_SCORE_BAND']","string indices must be integers, not 'str'"
+97f8f1,6,2025-12-01 21:27:14.340301+00:00,5,What is GNS4 trend for last 4 months?,Collections,COLLECTIONS,SKIP,Ref Broken,0.02,0,0,"WITH MaxBusinessDate AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_date
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  DATE_TRUNC(t1.BUSINESS_DATE, MONTH) AS month,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN t1.Bounce_Flag = 'Y' THEN t1.AGREEMENTNO END),
+      COUNT(DISTINCT t1.AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS gns4_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t1
+CROSS JOIN MaxBusinessDate AS mbd
+WHERE
+  t1.BUSINESS_DATE >= DATE_SUB(mbd.max_date, INTERVAL '4' MONTH)
+  AND t1.MOB_ON_INSTL_START_DATE = 4
+  AND t1.SOM_NPASTAGEID = 'REGULAR'
+  AND t1.SOM_POS > 0
+GROUP BY
+  1
+ORDER BY
+  1 DESC",Metric: GNS4 Rate (Bounce='Y' at MOB 4). Scenario 1 (Bounce Analysis) applies. Logic: Filter MOB_ON_INSTL_START_DATE = 4 AND Bounce_Flag = 'Y'. Exclusions: SOM_NPASTAGEID = 'REGULAR' and SOM_POS > 0. Time: Last 4 months relative to MAX date. The trend implies grouping by month.,"['GNS4: Bounce_Flag, MOB_ON_INSTL_START_DATE', 'Time: BUSINESS_DATE']","string indices must be integers, not 'str'"
+97f8f1,6,2025-12-01 21:27:20.599330+00:00,6,Show me the top 10 dealers where banking model has highest no hit percentage? application count should be greater than 30 and what is the approval percentage?,Sourcing,SOURCING,SKIP,Ref Broken,0.03,3251,564,"SELECT
+  Dealer_Name_Supplier__c AS dealer_name,
+  COUNT(*) AS total_applications,
+  COUNT(
+    CASE
+      WHEN NOT (
+        FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%'
+        OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%'
+      )
+      THEN 1
+    END
+  ) AS banking_no_hits,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(
+        CASE
+          WHEN NOT (
+            FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%'
+            OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%'
+          )
+          THEN 1
+        END
+      ),
+      COUNT(*)
+    ) * 100,
+    2
+  ) AS banking_no_hit_percentage,
+  COUNT(CASE WHEN BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction') THEN 1 END) AS approved_applications,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(CASE WHEN BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction') THEN 1 END),
+      COUNT(*)
+    ) * 100,
+    2
+  ) AS approval_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`
+WHERE
+  DATE(LastModifiedDate) >= DATE_SUB(CURRENT_DATE, INTERVAL '3' MONTH)
+GROUP BY
+  dealer_name
+HAVING
+  total_applications > 30
+ORDER BY
+  banking_no_hit_percentage DESC
+LIMIT 10","The user is asking for the top 10 dealers based on the 'banking model no hit percentage' and also wants the approval percentage. This involves calculating total applications, banking hits, banking no-hits, and approved applications. The request is about 'applications' and 'approval percentage', so it falls under Scenario A (Sourcing) and uses `LastModifiedDate`. No specific date range was mentioned, so the default 'Last 3 Months' is applied. A filter for application count > 30 is also applied.","['Dealer Name: Dealer_Name_Supplier__c', ""Banking Hit Status: FINAL_APPLICANT_SCORECARD_MODEL_BRE (LIKE '%_BKH%' OR LIKE '%_BKR%')"", 'Approval Status: BRE_Sanction_Result__c', 'Application Date: LastModifiedDate']","string indices must be integers, not 'str'"
+97f8f1,6,2025-12-01 21:27:27.615077+00:00,7,What is the rejection based on CIBIL score below 650 in the last 3 months? Month on month?,Sourcing,SOURCING,SKIP,Ref Broken,0.02,3244,317,"SELECT
+  DATE_TRUNC(DATE(LastModifiedDate), MONTH) AS month,
+  COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END) AS rejected_applications
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`
+WHERE
+  DATE(LastModifiedDate) >= DATE_SUB(CURRENT_DATE, INTERVAL '3' MONTH)
+  AND SAFE_CAST(CIBIL_SCORE AS INT64) < 650
+GROUP BY
+  1
+ORDER BY
+  1","Metric: Rejection count. Dimension: Month-on-month. Filter: CIBIL score below 650. Scenario A (Sourcing) applies, so using `LastModifiedDate` and filtering for the last 3 months. `CIBIL_SCORE` is a STRING and needs `SAFE_CAST` to `INT64` for numeric comparison. Rejection is defined by `BRE_Sanction_Result__c`.","['Rejection Status: BRE_Sanction_Result__c', 'CIBIL Score: CIBIL_SCORE', 'Application Date: LastModifiedDate']","string indices must be integers, not 'str'"
+97f8f1,6,2025-12-01 21:27:32.729796+00:00,8,What is the rejection rate for applications where CIBIL score is between 300-650 in October 2025? Also list out the reason of rejections for these cases.,Sourcing,SOURCING,SKIP,Ref Broken,0.39,3260,797,"thought_process
+The user is asking for the rejection rate and reasons for applications with a specific CIBIL score range in a given month.
+This falls under Scenario A (Sourcing, Approvals, Rejections, Volume) for date logic, so `LastModifiedDate` will be used.
+The CIBIL score range is 300-650, which maps to `CIBIL_SCORE`. This column is a STRING, so it needs `SAFE_CAST` to `INT64` for numeric comparison.
+Rejection status is defined by `BRE_Sanction_Result__c IN ('REJECT', 'Reject')`.
+The rejection reason is not explicitly available as a single column in the provided schema. I will assume the user is asking for the `SCORECARD_MODEL_DESCRIPTION_BRE__c` or similar descriptive field that might contain rejection reasons. Given the schema, `SCORECARD_MODEL_DESCRIPTION_BRE__c` seems like the most appropriate field for ""reason of rejections"".
+
+Steps:
+1.  Filter by `LastModifiedDate` for October 2025.
+2.  Filter by `CIBIL_SCORE` between 300 and 650 (inclusive), casting `CIBIL_SCORE` to `INT64`.
+3.  Calculate the total number of applications in this segment.
+4.  Calculate the number of rejected applications in this segment.
+5.  Calculate the rejection rate.
+6.  Group by `SCORECARD_MODEL_DESCRIPTION_BRE__c` to list rejection reasons for these cases.{
+  ""thought_process"": ""Metric: Rejection Rate and Reasons. Scenario A (Sourcing) for date logic, using `LastModifiedDate`. Date filter for October 2025. Filter by CIBIL score range (300-650), requiring `SAFE_CAST` for `CIBIL_SCORE`. Rejection status is defined by `BRE_Sanction_Result__c`. The 'reason of rejections' is mapped to `SCORECARD_MODEL_DESCRIPTION_BRE__c` as it's the most relevant descriptive field in the schema for such information."",
+  ""column_mapping"": {
+    ""CIBIL Score"": ""CIBIL_SCORE"",
+    ""Rejection Status"": ""BRE_Sanction_Result__c"",
+    ""Rejection Reason"": ""SCORECARD_MODEL_DESCRIPTION_BRE__c"",
+    ""Application Date"": ""LastModifiedDate""
+  },
+  ""sql"": ""SELECT\n    SCORECARD_MODEL_DESCRIPTION_BRE__c AS rejection_reason,\n    COUNT(*) AS total_applications_in_segment,\n    COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END) AS rejected_applications,\n    ROUND(SAFE_DIVIDE(COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END), COUNT(*)) * 100, 2) AS rejection_rate_pct\nFROM\n    `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`\nWHERE\n    DATE(LastModifiedDate) >= '2025-10-01'\n    AND DATE(LastModifiedDate) < '2025-11-01'\n    AND SAFE_CAST(CIBIL_SCORE AS INT64) BETWEEN 300 AND 650\nGROUP BY\n    rejection_reason\nORDER BY\n    rejected_applications DESC;""
+}",No thought process returned.,[],"400 Syntax error: Unexpected identifier ""thought_process"" at [1:1]; reason: invalidQuery, location: query, message: Syntax error: Unexpected identifier ""thought_process"" at [1:1]
+
+Location: US
+Job ID: 62e54bcc-612c-4067-815e-29042b212107
+"
+97f8f1,6,2025-12-01 21:27:47.489211+00:00,9,Which state has the highest roll forward rate for the current month in DPD BKT 2?,Collections,COLLECTIONS,PASS,LLM: The candidate data correctly identifies the state with the highest roll forward rate and all corresponding values match the reference data.,1.16,0,0,"SELECT
+  STATE,
+  COUNT(DISTINCT CASE WHEN (
+    DPD_BUCKET - SOM_DPD_BUCKET
+  ) > 0 THEN AGREEMENTNO END) AS roll_forward_count,
+  COUNT(DISTINCT AGREEMENTNO) AS total_bucket_2_count,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN (
+        DPD_BUCKET - SOM_DPD_BUCKET
+      ) > 0 THEN AGREEMENTNO END),
+      COUNT(DISTINCT AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS roll_forward_rate
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+WHERE
+  BUSINESS_DATE = (
+    SELECT
+      MAX(BUSINESS_DATE)
+    FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+  )
+  AND SOM_DPD_BUCKET = 2
+  AND NPASTAGEID = 'REGULAR'
+  AND POS > 0
+GROUP BY
+  STATE
+ORDER BY
+  roll_forward_rate DESC
+LIMIT 1","Metric: Roll Forward Rate (DPD_BUCKET > SOM_DPD_BUCKET). Population: SOM_DPD_BUCKET = 2. Scenario 3 (Standard Portfolio Performance) applies, so filter `POS > 0 AND NPASTAGEID = 'REGULAR'`. Time: Current month, so filter `BUSINESS_DATE = (SELECT MAX(BUSINESS_DATE) FROM ...)`. Group by STATE and order by roll forward rate descending to find the highest.","['Roll Forward Rate: DPD_BUCKET, SOM_DPD_BUCKET', 'State: STATE', 'Current Month: BUSINESS_DATE']",
+97f8f1,6,2025-12-01 21:28:04.015152+00:00,10,Analyze the portfolio risk by Ticket Size: Amount Finance and show the 90+ DPD POS % for each? highest first.,Collections,COLLECTIONS,PASS,"LLM: The candidate data correctly identifies the requested dimension (Ticket Size) and metric (90+ DPD POS %), and the values are an exact match to the reference data. The results are also correctly sorted in descending order as requested.",1.01,0,0,"SELECT
+  AMTFIN_BAND,
+  ROUND(SAFE_DIVIDE(SUM(NR_90_PLUS), SUM(POS)) * 100, 2) AS ninety_plus_dpd_pos_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+WHERE
+  BUSINESS_DATE = (
+    SELECT
+      MAX(BUSINESS_DATE)
+    FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+  )
+  AND POS > 0
+GROUP BY
+  1
+ORDER BY
+  ninety_plus_dpd_pos_percentage DESC",Metric: 90+ DPD POS %. User explicitly asks for '90+ DPD'. CRITICAL: I MUST use the pre-calculated column `NR_90_PLUS` (numerator) and `POS` (denominator). I must NOT try to calculate this using DPD_BUCKET filters. Grouping: 'Ticket Size: Amount Finance' maps to `AMTFIN_BAND`. Scenario 2 (Risk) applies (filter POS > 0 only). Time: Current snapshot (MAX BUSINESS_DATE). Ordering: Highest first.,"['Ticket Size: AMTFIN_BAND', '90+ DPD Risk: NR_90_PLUS / POS']",
+97f8f1,7,2025-12-01 21:28:26.325673+00:00,1,what is the current 0+ performance for dealer categories?,Collections,COLLECTIONS,PASS,"LLM: The candidate data is a perfect match to the reference data. All rows and values are identical, differing only in column order which is acceptable per the evaluation criteria.",0.83,0,0,"SELECT
+  Supplier_Categorization__Credit_Team,
+  COUNT(DISTINCT CASE WHEN DPD > 0 THEN AGREEMENTNO END) AS col_0_plus_dpd_accounts,
+  COUNT(DISTINCT AGREEMENTNO) AS total_accounts,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN DPD > 0 THEN AGREEMENTNO END),
+      COUNT(DISTINCT AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS col_0_plus_dpd_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+WHERE
+  BUSINESS_DATE = (
+    SELECT
+      MAX(BUSINESS_DATE)
+    FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+  )
+  AND POS > 0
+  AND NPASTAGEID = 'REGULAR'
+GROUP BY
+  Supplier_Categorization__Credit_Team
+ORDER BY
+  col_0_plus_dpd_percentage DESC","Metric: 0+ DPD (DPD > 0). Grouping: Dealer Categories (Supplier_Categorization__Credit_Team). Time: Current (MAX BUSINESS_DATE). Scenario 3 (Standard Portfolio Performance) applies, so filter `POS > 0 AND NPASTAGEID = 'REGULAR'`.","['0+ DPD: DPD', 'Dealer Categories: Supplier_Categorization__Credit_Team']",
+97f8f1,7,2025-12-01 21:28:34.023416+00:00,2,what are the last 3 months disbursals where datasutram model score is more than 500?,Sourcing,SOURCING,ERROR,SQL Error: 400 Syntax error: Unclosed str,0.27,3242,388,"SELECT COUNT(*) AS total_disbursals FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25` WHERE DISBURSALDATE >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH) AND DISBURSALDATE IS NOT NULL AND SAFE_CAST(Datasutram_score__c AS INT64) > 500""
+}",No thought process returned.,[],"400 Syntax error: Unclosed string literal at [1:260]; reason: invalidQuery, location: query, message: Syntax error: Unclosed string literal at [1:260]
+
+Location: asia-south1
+Job ID: 5661c890-9ea5-467d-9c4b-4c4c7cef47d5
+"
+97f8f1,7,2025-12-01 21:28:44.712885+00:00,3,what is the percentage of disbursed cases for last 3 months month on month out of total disbursed for final_application_scorecard model category BH_BKNH_PH? ,Sourcing,SOURCING,ERROR,SQL Error: 400 Syntax error: Unexpected i,0.39,3254,1906,"thought_process
+The user is asking for the percentage of disbursed cases month-on-month for a specific `FINAL_APPLICANT_SCORECARD_MODEL_BRE` category (`BH_BKNH_PH`).
+This is a disbursal-related metric, so I will use `DISBURSALDATE` and filter for `DISBURSALDATE IS NOT NULL`.
+The time window is ""last 3 months month on month"", which means I need to group by month and filter for the last 3 full months.
+The specific model category is `BH_BKNH_PH`.
+I need to calculate the count of disbursed cases for this category for each month and then divide it by the total disbursed cases for that month (within the specified category) to get the percentage.
+The question asks for ""percentage of disbursed cases for last 3 months month on month out of total disbursed for final_application_scorecard model category BH_BKNH_PH"". This implies:
+1. Filter for `FINAL_APPLICANT_SCORECARD_MODEL_BRE = 'BH_BKNH_PH'`.
+2. Filter for `DISBURSALDATE IS NOT NULL` and within the last 3 months.
+3. Group by month of `DISBURSALDATE`.
+4. Calculate the count of disbursed cases for each month.
+5. The ""out of total disbursed for final_application_scorecard model category BH_BKNH_PH"" part is a bit ambiguous. It could mean:
+    a) Percentage of `BH_BKNH_PH` disbursed cases in a month relative to *all* `BH_BKNH_PH` disbursed cases in the last 3 months.
+    b) Percentage of `BH_BKNH_PH` disbursed cases in a month relative to *all* disbursed cases in that month (regardless of model category).
+
+Given the phrasing ""out of total disbursed for final_application_scorecard model category BH_BKNH_PH"", it sounds like the denominator should be the total disbursed cases *within that specific model category* over the entire 3-month period, and the numerator is the monthly count for that category.
+
+Let's re-read: ""percentage of disbursed cases for last 3 months month on month out of total disbursed for final_application_scorecard model category BH_BKNH_PH"".
+This means:
+- Filter for `FINAL_APPLICANT_SCORECARD_MODEL_BRE = 'BH_BKNH_PH'`.
+- Filter for `DISBURSALDATE IS NOT NULL`.
+- Filter for `DISBURSALDATE` within the last 3 months.
+- Calculate the total count of disbursed cases for `BH_BKNH_PH` in the last 3 months.
+- For each month within the last 3 months, calculate the count of disbursed cases for `BH_BKNH_PH`.
+- Divide the monthly count by the total 3-month count to get the percentage.
+
+Let's define ""last 3 months"" for disbursals. It means `DISBURSALDATE >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH)`.
+However, ""month on month"" usually implies full calendar months. So, it should be `DATE_TRUNC(DISBURSALDATE, MONTH) >= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH), MONTH)`.
+To get the last 3 *full* months, it's better to use `DATE_TRUNC(DISBURSALDATE, MONTH) >= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH), MONTH)` and `DATE_TRUNC(DISBURSALDATE, MONTH) < DATE_TRUNC(CURRENT_DATE(), MONTH)`.
+
+Let's refine the date logic for ""last 3 months month on month"".
+If today is 2023-11-20, ""last 3 months"" would typically mean August, September, October.
+So, `DISBURSALDATE >= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH), MONTH)` and `DISBURSALDATE < DATE_TRUNC(CURRENT_DATE(), MONTH)`.
+
+Steps:
+1. Filter for `DISBURSALDATE IS NOT NULL`.
+2. Filter for `FINAL_APPLICANT_SCORECARD_MODEL_BRE = 'BH_BKNH_PH'`.
+3. Filter for the last 3 full months based on `DISBURSALDATE`.
+4. Calculate the total count of disbursed cases for the specified model and period.
+5. Group by month of `DISBURSALDATE`.
+6. Calculate the count for each month.
+7. Calculate the percentage of each month's count relative to the total count.
+
+Let's consider the date range for ""last 3 months month on month"".
+If `CURRENT_DATE()` is '2023-11-20', then `DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH)` is '2023-08-20'.
+`DATE_TRUNC('2023-08-20', MONTH)` is '2023-08-01'.
+`DATE_TRUNC(CURRENT_DATE(), MONTH)` is '2023-11-01'.
+So the filter `DISBURSALDATE >= '2023-08-01' AND DISBURSALDATE < '2023-11-01'` will cover August, September, October. This seems correct for ""last 3 months month on month"".
+
+The question asks for ""percentage of disbursed cases for last 3 months month on month out of total disbursed for final_application_scorecard model category BH_BKNH_PH"".
+This means:
+- Numerator: Count of disbursed cases for `BH_BKNH_PH` in a specific month.
+- Denominator: Total count of disbursed cases for `BH_BKNH_PH` across the entire 3-month period.
+
+So, I'll calculate the total count first, then monthly counts, and then the percentage.{
+  ""thought_process"": ""The user is asking for the month-on-month percentage of disbursed cases for a specific scorecard model category ('BH_BKNH_PH') over the last 3 full months. This is a disbursal-related metric, so I will use `DISBURSALDATE` and filter for `DISBURSALDATE IS NOT NULL`. The date range will cover the last three complete calendar months. I will first calculate the total disbursed cases for the specified model category within this 3-month period. Then, I will calculate the monthly disbursed cases for the same category and period. Finally, I will compute the percentage of each month's count relative to the total 3-month count."",
+  ""column_mapping"": {
+    ""Disbursed Cases"": ""DISBURSALDATE IS NOT NULL"",
+    ""Scorecard Model Category"": ""FINAL_APPLICANT_SCORECARD_MODEL_BRE"",
+    ""Disbursal Date"": ""DISBURSALDATE""
+  },
+  ""sql"": ""WITH MonthlyDisbursals AS (\n    SELECT\n        DATE_TRUNC(DISBURSALDATE, MONTH) AS disbursal_month,\n        COUNT(*) AS monthly_disbursed_count\n    FROM\n        `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`\n    WHERE\n        DISBURSALDATE IS NOT NULL\n        AND FINAL_APPLICANT_SCORECARD_MODEL_BRE = 'BH_BKNH_PH'\n        AND DATE_TRUNC(DISBURSALDATE, MONTH) >= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH), MONTH)\n        AND DATE_TRUNC(DISBURSALDATE, MONTH) < DATE_TRUNC(CURRENT_DATE(), MONTH)\n    GROUP BY\n        1\n),\nTotalDisbursals AS (\n    SELECT\n        SUM(monthly_disbursed_count) AS total_disbursed_for_category\n    FROM\n        MonthlyDisbursals\n)\nSELECT\n    FORMAT_DATE('%Y-%m', m.disbursal_month) AS disbursal_month,\n    m.monthly_disbursed_count,\n    ROUND(SAFE_DIVIDE(m.monthly_disbursed_count, t.total_disbursed_for_category) * 100, 2) AS percentage_of_total_disbursed\nFROM\n    MonthlyDisbursals m,\n    TotalDisbursals t\nORDER BY\n    m.disbursal_month;""
+}",No thought process returned.,[],"400 Syntax error: Unexpected identifier ""thought_process"" at [1:1]; reason: invalidQuery, location: query, message: Syntax error: Unexpected identifier ""thought_process"" at [1:1]
+
+Location: US
+Job ID: 21cfa16c-e4b8-432d-9c53-b7db597045e6
+"
+97f8f1,7,2025-12-01 21:28:58.543436+00:00,4,what are the percentage of last 3 months disbursals in S10 category of CRIF Index?,Sourcing,SOURCING,FAIL,LLM: The candidate's calculated percentage of 0 is incorrect. The reference value is 12.77. The difference is significant and exceeds the 1% numeric tolerance. [Data_Mismatch],0.85,3240,258,"SELECT
+  ROUND(
+    SAFE_DIVIDE(COUNT(CASE WHEN CRIF_SCORE_BAND = 'S10' THEN 1 END), COUNT(*)) * 100,
+    2
+  ) AS percentage_disbursals_in_s10
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`
+WHERE
+  DISBURSALDATE >= DATE_SUB(CURRENT_DATE, INTERVAL '3' MONTH)
+  AND NOT DISBURSALDATE IS NULL","Metric: Percentage of disbursals in a specific CRIF score band. Scenario B (Disbursals) is triggered by 'disbursals'. Date field: DISBURSALDATE, filtered for NOT NULL and last 3 months. Dimension: CRIF_SCORE_BAND. Calculation involves counting disbursals within the 'S10' band and dividing by total disbursals for the period.","['Disbursal Date: DISBURSALDATE', 'CRIF Score Band: CRIF_SCORE_BAND']",
+97f8f1,7,2025-12-01 21:29:14.736113+00:00,5,What is GNS4 trend for last 4 months?,Collections,COLLECTIONS,PASS,LLM: The candidate data contains all the correct rows and values from the reference data. The difference in row order is acceptable as the user's question about a 'trend' does not mandate a specific sort order.,0.77,0,0,"WITH MaxBusinessDate AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_date
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  DATE_TRUNC(t1.BUSINESS_DATE, MONTH) AS month,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN t1.Bounce_Flag = 'Y' THEN t1.AGREEMENTNO END),
+      COUNT(DISTINCT t1.AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS gns4_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t1
+CROSS JOIN MaxBusinessDate AS mbd
+WHERE
+  t1.BUSINESS_DATE >= DATE_SUB(mbd.max_date, INTERVAL '4' MONTH)
+  AND t1.MOB_ON_INSTL_START_DATE = 4
+  AND t1.SOM_NPASTAGEID = 'REGULAR'
+  AND t1.SOM_POS > 0
+GROUP BY
+  1
+ORDER BY
+  1 DESC",Metric: GNS4 Rate (Bounce='Y' at MOB 4). Scenario 1 (Bounce Analysis) applies. Logic: Filter MOB_ON_INSTL_START_DATE = 4 AND Bounce_Flag = 'Y'. Exclusions: SOM_NPASTAGEID = 'REGULAR' and SOM_POS > 0. Time: Last 4 months relative to MAX date. The trend implies grouping by month.,"['GNS4: Bounce_Flag, MOB_ON_INSTL_START_DATE', 'Time: BUSINESS_DATE']",
+97f8f1,7,2025-12-01 21:29:36.585263+00:00,6,Show me the top 10 dealers where banking model has highest no hit percentage? application count should be greater than 30 and what is the approval percentage?,Sourcing,SOURCING,PASS,"LLM: The candidate data is a perfect match to the reference data. It correctly identifies the top 10 dealers, applies the filter condition, and presents all data points and calculations accurately and in the correct descending order based on the 'no hit' percentage.",1.16,3251,564,"SELECT
+  Dealer_Name_Supplier__c AS dealer_name,
+  COUNT(*) AS total_applications,
+  COUNT(
+    CASE
+      WHEN NOT (
+        FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%'
+        OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%'
+      )
+      THEN 1
+    END
+  ) AS banking_no_hits,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(
+        CASE
+          WHEN NOT (
+            FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%'
+            OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%'
+          )
+          THEN 1
+        END
+      ),
+      COUNT(*)
+    ) * 100,
+    2
+  ) AS banking_no_hit_percentage,
+  COUNT(CASE WHEN BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction') THEN 1 END) AS approved_applications,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(CASE WHEN BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction') THEN 1 END),
+      COUNT(*)
+    ) * 100,
+    2
+  ) AS approval_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`
+WHERE
+  DATE(LastModifiedDate) >= DATE_SUB(CURRENT_DATE, INTERVAL '3' MONTH)
+GROUP BY
+  dealer_name
+HAVING
+  total_applications > 30
+ORDER BY
+  banking_no_hit_percentage DESC
+LIMIT 10","The user is asking for the top 10 dealers based on the 'banking model no hit percentage' and also wants the approval percentage. This involves calculating total applications, banking hits, banking no-hits, and approved applications. The request is about 'applications' and 'approval percentage', so it falls under Scenario A (Sourcing) and uses `LastModifiedDate`. No specific date range was mentioned, so the default 'Last 3 Months' is applied. A filter for application count > 30 is also applied.","['Dealer Name: Dealer_Name_Supplier__c', ""Banking Hit Status: FINAL_APPLICANT_SCORECARD_MODEL_BRE (LIKE '%_BKH%' OR LIKE '%_BKR%')"", 'Approval Status: BRE_Sanction_Result__c', 'Application Date: LastModifiedDate']",
+97f8f1,7,2025-12-01 21:29:42.927546+00:00,7,What is the rejection based on CIBIL score below 650 in the last 3 months? Month on month?,Sourcing,COLLECTIONS,ERROR,SQL Error: No SQL Generated,0.0,0,0,,,[],No SQL Generated
+97f8f1,7,2025-12-01 21:29:49.227977+00:00,8,What is the rejection rate for applications where CIBIL score is between 300-650 in October 2025? Also list out the reason of rejections for these cases.,Sourcing,SOURCING,ERROR,SQL Error: 400 Syntax error: Unexpected i,0.38,3260,797,"thought_process
+The user is asking for the rejection rate and reasons for applications with a specific CIBIL score range in a given month.
+This falls under Scenario A (Sourcing, Approvals, Rejections, Volume) for date logic, so `LastModifiedDate` will be used.
+The CIBIL score range is 300-650, which maps to `CIBIL_SCORE`. This column is a STRING, so it needs `SAFE_CAST` to `INT64` for numeric comparison.
+Rejection status is defined by `BRE_Sanction_Result__c IN ('REJECT', 'Reject')`.
+The rejection reason is not explicitly available as a single column in the provided schema. I will assume the user is asking for the `SCORECARD_MODEL_DESCRIPTION_BRE__c` or similar descriptive field that might contain rejection reasons. Given the schema, `SCORECARD_MODEL_DESCRIPTION_BRE__c` seems like the most appropriate field for ""reason of rejections"".
+
+Steps:
+1.  Filter by `LastModifiedDate` for October 2025.
+2.  Filter by `CIBIL_SCORE` between 300 and 650 (inclusive), casting `CIBIL_SCORE` to `INT64`.
+3.  Calculate the total number of applications in this segment.
+4.  Calculate the number of rejected applications in this segment.
+5.  Calculate the rejection rate.
+6.  Group by `SCORECARD_MODEL_DESCRIPTION_BRE__c` to list rejection reasons for these cases.{
+  ""thought_process"": ""Metric: Rejection Rate and Reasons. Scenario A (Sourcing) for date logic, using `LastModifiedDate`. Date filter for October 2025. Filter by CIBIL score range (300-650), requiring `SAFE_CAST` for `CIBIL_SCORE`. Rejection status is defined by `BRE_Sanction_Result__c`. The 'reason of rejections' is mapped to `SCORECARD_MODEL_DESCRIPTION_BRE__c` as it's the most relevant descriptive field in the schema for such information."",
+  ""column_mapping"": {
+    ""CIBIL Score"": ""CIBIL_SCORE"",
+    ""Rejection Status"": ""BRE_Sanction_Result__c"",
+    ""Rejection Reason"": ""SCORECARD_MODEL_DESCRIPTION_BRE__c"",
+    ""Application Date"": ""LastModifiedDate""
+  },
+  ""sql"": ""SELECT\n    SCORECARD_MODEL_DESCRIPTION_BRE__c AS rejection_reason,\n    COUNT(*) AS total_applications_in_segment,\n    COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END) AS rejected_applications,\n    ROUND(SAFE_DIVIDE(COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END), COUNT(*)) * 100, 2) AS rejection_rate_pct\nFROM\n    `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`\nWHERE\n    DATE(LastModifiedDate) >= '2025-10-01'\n    AND DATE(LastModifiedDate) < '2025-11-01'\n    AND SAFE_CAST(CIBIL_SCORE AS INT64) BETWEEN 300 AND 650\nGROUP BY\n    rejection_reason\nORDER BY\n    rejected_applications DESC;""
+}",No thought process returned.,[],"400 Syntax error: Unexpected identifier ""thought_process"" at [1:1]; reason: invalidQuery, location: query, message: Syntax error: Unexpected identifier ""thought_process"" at [1:1]
+
+Location: US
+Job ID: a4624ccc-776d-448b-b07a-8da9c6535335
+"
+97f8f1,7,2025-12-01 21:30:04.703710+00:00,9,Which state has the highest roll forward rate for the current month in DPD BKT 2?,Collections,COLLECTIONS,PASS,"LLM: The candidate data correctly identifies the state with the highest roll forward rate, and all corresponding values for roll count, total accounts, and the rate itself are identical to the reference data.",0.78,0,0,"SELECT
+  STATE,
+  COUNT(DISTINCT CASE WHEN (
+    DPD_BUCKET - SOM_DPD_BUCKET
+  ) > 0 THEN AGREEMENTNO END) AS roll_forward_count,
+  COUNT(DISTINCT AGREEMENTNO) AS total_bucket_2_count,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN (
+        DPD_BUCKET - SOM_DPD_BUCKET
+      ) > 0 THEN AGREEMENTNO END),
+      COUNT(DISTINCT AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS roll_forward_rate
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+WHERE
+  BUSINESS_DATE = (
+    SELECT
+      MAX(BUSINESS_DATE)
+    FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+  )
+  AND SOM_DPD_BUCKET = 2
+  AND NPASTAGEID = 'REGULAR'
+  AND POS > 0
+GROUP BY
+  STATE
+ORDER BY
+  roll_forward_rate DESC
+LIMIT 1","Metric: Roll Forward Rate (DPD_BUCKET > SOM_DPD_BUCKET). Population: SOM_DPD_BUCKET = 2. Scenario 3 (Standard Portfolio Performance) applies, so filter `POS > 0 AND NPASTAGEID = 'REGULAR'`. Time: Current month, so filter `BUSINESS_DATE = (SELECT MAX(BUSINESS_DATE) FROM ...)`. Group by STATE and order by roll forward rate descending to find the highest.","['Roll Forward Rate: DPD_BUCKET, SOM_DPD_BUCKET', 'State: STATE', 'Current Month: BUSINESS_DATE']",
+97f8f1,7,2025-12-01 21:30:20.409746+00:00,10,Analyze the portfolio risk by Ticket Size: Amount Finance and show the 90+ DPD POS % for each? highest first.,Collections,COLLECTIONS,PASS,"LLM: The candidate data correctly identifies the requested dimension (Amount Finance bands) and the metric (90+ DPD POS %), and sorts the results in the correct descending order. All data points match the reference data exactly.",0.83,0,0,"SELECT
+  AMTFIN_BAND,
+  ROUND(SAFE_DIVIDE(SUM(NR_90_PLUS), SUM(POS)) * 100, 2) AS ninety_plus_dpd_pos_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+WHERE
+  BUSINESS_DATE = (
+    SELECT
+      MAX(BUSINESS_DATE)
+    FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+  )
+  AND POS > 0
+GROUP BY
+  1
+ORDER BY
+  ninety_plus_dpd_pos_percentage DESC",Metric: 90+ DPD POS %. User explicitly asks for '90+ DPD'. CRITICAL: I MUST use the pre-calculated column `NR_90_PLUS` (numerator) and `POS` (denominator). I must NOT try to calculate this using DPD_BUCKET filters. Grouping: 'Ticket Size: Amount Finance' maps to `AMTFIN_BAND`. Scenario 2 (Risk) applies (filter POS > 0 only). Time: Current snapshot (MAX BUSINESS_DATE). Ordering: Highest first.,"['Ticket Size: AMTFIN_BAND', '90+ DPD Risk: NR_90_PLUS / POS']",
+97f8f1,8,2025-12-01 21:30:40.945001+00:00,1,what is the current 0+ performance for dealer categories?,Collections,COLLECTIONS,PASS,LLM: The candidate data is a perfect match to the reference data. All rows and corresponding values are identical. The difference in column order is ignored as per the evaluation criteria.,0.75,0,0,"SELECT
+  Supplier_Categorization__Credit_Team,
+  COUNT(DISTINCT CASE WHEN DPD > 0 THEN AGREEMENTNO END) AS col_0_plus_dpd_accounts,
+  COUNT(DISTINCT AGREEMENTNO) AS total_accounts,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN DPD > 0 THEN AGREEMENTNO END),
+      COUNT(DISTINCT AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS col_0_plus_dpd_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+WHERE
+  BUSINESS_DATE = (
+    SELECT
+      MAX(BUSINESS_DATE)
+    FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+  )
+  AND POS > 0
+  AND NPASTAGEID = 'REGULAR'
+GROUP BY
+  Supplier_Categorization__Credit_Team
+ORDER BY
+  col_0_plus_dpd_percentage DESC","Metric: 0+ DPD (DPD > 0). Grouping: Dealer Categories (Supplier_Categorization__Credit_Team). Time: Current (MAX BUSINESS_DATE). Scenario 3 (Standard Portfolio Performance) applies, so filter `POS > 0 AND NPASTAGEID = 'REGULAR'`.","['0+ DPD: DPD', 'Dealer Categories: Supplier_Categorization__Credit_Team']",
+97f8f1,8,2025-12-01 21:31:13.224284+00:00,2,what are the last 3 months disbursals where datasutram model score is more than 500?,Sourcing,COLLECTIONS,FAIL,"LLM: The candidate returned a disbursal count of 0, while the reference data indicates the correct count is 146,806. The values are completely different. [Data_Mismatch]",0.68,0,0,"WITH DateAnchor AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_business_date
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  COUNT(DISTINCT t1.AGREEMENTNO) AS disbursals_count
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t1
+CROSS JOIN DateAnchor AS da
+WHERE
+  t1.DISBURSALDATE >= DATE_SUB(da.max_business_date, INTERVAL '3' MONTH)
+  AND t1.DISBURSALDATE <= da.max_business_date
+  AND t1.EWS_Model_Score > 500","The user is asking for a count of 'disbursals' (unique agreements) within a specific time frame ('last 3 months') and with a condition on 'datasutram model score'. This is a vintage-like analysis, so according to the CRITICAL RULE for Vintage Analysis, I must filter by `DISBURSALDATE` range and NOT by `BUSINESS_DATE`. The 'last 3 months' for `DISBURSALDATE` will be relative to the `MAX(BUSINESS_DATE)` in the table. The `EWS_Model_Score` filter is applied directly. No specific 3-way switch scenario applies as this is about the initial cohort of disbursed loans, not current portfolio performance, bounce, or write-off status.","['Disbursals: AGREEMENTNO', 'Disbursal Date: DISBURSALDATE', 'Datasutram Model Score: EWS_Model_Score']",
+97f8f1,8,2025-12-01 21:31:19.312605+00:00,3,what is the percentage of disbursed cases for last 3 months month on month out of total disbursed for final_application_scorecard model category BH_BKNH_PH? ,Sourcing,SOURCING,ERROR,SQL Error: 400 Syntax error: Unexpected i,0.35,3254,696,"thought_process
+The user is asking for the percentage of disbursed cases month-on-month for a specific `FINAL_APPLICANT_SCORECARD_MODEL_BRE` category (`BH_BKNH_PH`).
+This is a disbursal-related metric, so I will use `DISBURSALDATE` and filter for `DISBURSALDATE IS NOT NULL`.
+The time window is ""last 3 months month on month"", which means I need to group by month and filter for the last 3 full months.
+The specific model category is `BH_BKNH_PH`.
+
+Steps:
+1.  Filter for disbursed cases (`DISBURSALDATE IS NOT NULL`).
+2.  Filter for the last 3 months based on `DISBURSALDATE`.
+3.  Filter for `FINAL_APPLICANT_SCORECARD_MODEL_BRE = 'BH_BKNH_PH'`.
+4.  Calculate the count of disbursed cases for the specified model category per month.
+5.  Calculate the total disbursed cases per month.
+6.  Calculate the percentage of the specified model category out of the total disbursed cases for each month.
+7.  Order by month.{
+  ""thought_process"": ""Metric: Percentage of disbursed cases for a specific scorecard model category ('BH_BKNH_PH') out of total disbursed cases, month-on-month. Scenario B (Disbursal) is applicable, so using `DISBURSALDATE` and filtering for `DISBURSALDATE IS NOT NULL`. The time window is 'last 3 months month on month', meaning we need to group by month and filter for the last 3 full months."",
+  ""column_mapping"": {
+    ""Disbursed Cases"": ""DISBURSALDATE IS NOT NULL"",
+    ""Final Applicant Scorecard Model Category"": ""FINAL_APPLICANT_SCORECARD_MODEL_BRE"",
+    ""Disbursal Date"": ""DISBURSALDATE""
+  },
+  ""sql"": ""SELECT\n    DATE_TRUNC(DISBURSALDATE, MONTH) AS disbursal_month,\n    COUNT(CASE WHEN FINAL_APPLICANT_SCORECARD_MODEL_BRE = 'BH_BKNH_PH' THEN 1 END) AS bh_bknh_ph_disbursed_count,\n    COUNT(*) AS total_disbursed_count,\n    ROUND(SAFE_DIVIDE(\n        COUNT(CASE WHEN FINAL_APPLICANT_SCORECARD_MODEL_BRE = 'BH_BKNH_PH' THEN 1 END),\n        COUNT(*)\n    ) * 100, 2) AS percentage_bh_bknh_ph\nFROM\n    `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`\nWHERE\n    DISBURSALDATE IS NOT NULL\n    AND DISBURSALDATE >= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH), MONTH)\n    AND DISBURSALDATE < DATE_TRUNC(CURRENT_DATE(), MONTH)\nGROUP BY\n    disbursal_month\nORDER BY\n    disbursal_month;""
+}",No thought process returned.,[],"400 Syntax error: Unexpected identifier ""thought_process"" at [1:1]; reason: invalidQuery, location: query, message: Syntax error: Unexpected identifier ""thought_process"" at [1:1]
+
+Location: US
+Job ID: 62b0909c-9981-4374-a3c7-43d8ea098504
+"
+97f8f1,8,2025-12-01 21:31:32.403365+00:00,4,what are the percentage of last 3 months disbursals in S10 category of CRIF Index?,Sourcing,SOURCING,FAIL,LLM: The candidate value '0' is incorrect. The reference value is '12.77'. The difference is well outside the 1% numeric tolerance. [Data_Mismatch],0.89,3240,258,"SELECT
+  ROUND(
+    SAFE_DIVIDE(COUNT(CASE WHEN CRIF_SCORE_BAND = 'S10' THEN 1 END), COUNT(*)) * 100,
+    2
+  ) AS percentage_disbursals_in_s10
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`
+WHERE
+  DISBURSALDATE >= DATE_SUB(CURRENT_DATE, INTERVAL '3' MONTH)
+  AND NOT DISBURSALDATE IS NULL","Metric: Percentage of disbursals in a specific CRIF score band. Scenario B (Disbursals) is triggered by 'disbursals'. Date field: DISBURSALDATE, filtered for NOT NULL and last 3 months. Dimension: CRIF_SCORE_BAND. Calculation involves counting disbursals within the 'S10' band and dividing by total disbursals for the period.","['Disbursal Date: DISBURSALDATE', 'CRIF Score Band: CRIF_SCORE_BAND']",
+97f8f1,8,2025-12-01 21:31:48.183591+00:00,5,What is GNS4 trend for last 4 months?,Collections,COLLECTIONS,PASS,LLM: The candidate data contains the exact same rows and values as the reference data. The difference in row order is acceptable as the user's question did not explicitly request a specific sort order.,0.71,0,0,"WITH MaxBusinessDate AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_date
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  DATE_TRUNC(t1.BUSINESS_DATE, MONTH) AS month,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN t1.Bounce_Flag = 'Y' THEN t1.AGREEMENTNO END),
+      COUNT(DISTINCT t1.AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS gns4_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t1
+CROSS JOIN MaxBusinessDate AS mbd
+WHERE
+  t1.BUSINESS_DATE >= DATE_SUB(mbd.max_date, INTERVAL '4' MONTH)
+  AND t1.MOB_ON_INSTL_START_DATE = 4
+  AND t1.SOM_NPASTAGEID = 'REGULAR'
+  AND t1.SOM_POS > 0
+GROUP BY
+  1
+ORDER BY
+  1 DESC",Metric: GNS4 Rate (Bounce='Y' at MOB 4). Scenario 1 (Bounce Analysis) applies. Logic: Filter MOB_ON_INSTL_START_DATE = 4 AND Bounce_Flag = 'Y'. Exclusions: SOM_NPASTAGEID = 'REGULAR' and SOM_POS > 0. Time: Last 4 months relative to MAX date. The trend implies grouping by month.,"['GNS4: Bounce_Flag, MOB_ON_INSTL_START_DATE', 'Time: BUSINESS_DATE']",
+97f8f1,8,2025-12-01 21:32:10.276988+00:00,6,Show me the top 10 dealers where banking model has highest no hit percentage? application count should be greater than 30 and what is the approval percentage?,Sourcing,SOURCING,PASS,"LLM: The candidate data is a perfect match to the reference data. It correctly identifies the top 10 dealers, applies the filter condition, and presents all data points and calculations accurately and in the correct descending order based on the 'no hit' percentage.",1.16,3251,564,"SELECT
+  Dealer_Name_Supplier__c AS dealer_name,
+  COUNT(*) AS total_applications,
+  COUNT(
+    CASE
+      WHEN NOT (
+        FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%'
+        OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%'
+      )
+      THEN 1
+    END
+  ) AS banking_no_hits,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(
+        CASE
+          WHEN NOT (
+            FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%'
+            OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%'
+          )
+          THEN 1
+        END
+      ),
+      COUNT(*)
+    ) * 100,
+    2
+  ) AS banking_no_hit_percentage,
+  COUNT(CASE WHEN BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction') THEN 1 END) AS approved_applications,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(CASE WHEN BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction') THEN 1 END),
+      COUNT(*)
+    ) * 100,
+    2
+  ) AS approval_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`
+WHERE
+  DATE(LastModifiedDate) >= DATE_SUB(CURRENT_DATE, INTERVAL '3' MONTH)
+GROUP BY
+  dealer_name
+HAVING
+  total_applications > 30
+ORDER BY
+  banking_no_hit_percentage DESC
+LIMIT 10","The user is asking for the top 10 dealers based on the 'banking model no hit percentage' and also wants the approval percentage. This involves calculating total applications, banking hits, banking no-hits, and approved applications. The request is about 'applications' and 'approval percentage', so it falls under Scenario A (Sourcing) and uses `LastModifiedDate`. No specific date range was mentioned, so the default 'Last 3 Months' is applied. A filter for application count > 30 is also applied.","['Dealer Name: Dealer_Name_Supplier__c', ""Banking Hit Status: FINAL_APPLICANT_SCORECARD_MODEL_BRE (LIKE '%_BKH%' OR LIKE '%_BKR%')"", 'Approval Status: BRE_Sanction_Result__c', 'Application Date: LastModifiedDate']",
+97f8f1,8,2025-12-01 21:32:15.731329+00:00,7,What is the rejection based on CIBIL score below 650 in the last 3 months? Month on month?,Sourcing,COLLECTIONS,ERROR,SQL Error: No SQL Generated,0.0,0,0,,,[],No SQL Generated
+97f8f1,8,2025-12-01 21:32:21.613713+00:00,8,What is the rejection rate for applications where CIBIL score is between 300-650 in October 2025? Also list out the reason of rejections for these cases.,Sourcing,SOURCING,ERROR,SQL Error: 400 Syntax error: Unexpected i,0.35,3260,797,"thought_process
+The user is asking for the rejection rate and reasons for applications with a specific CIBIL score range in a given month.
+This falls under Scenario A (Sourcing, Approvals, Rejections, Volume) for date logic, so `LastModifiedDate` will be used.
+The CIBIL score range is 300-650, which maps to `CIBIL_SCORE`. This column is a STRING, so it needs `SAFE_CAST` to `INT64` for numeric comparison.
+Rejection status is defined by `BRE_Sanction_Result__c IN ('REJECT', 'Reject')`.
+The rejection reason is not explicitly available as a single column in the provided schema. I will assume the user is asking for the `SCORECARD_MODEL_DESCRIPTION_BRE__c` or similar descriptive field that might contain rejection reasons. Given the schema, `SCORECARD_MODEL_DESCRIPTION_BRE__c` seems like the most appropriate field for ""reason of rejections"".
+
+Steps:
+1.  Filter by `LastModifiedDate` for October 2025.
+2.  Filter by `CIBIL_SCORE` between 300 and 650 (inclusive), casting `CIBIL_SCORE` to `INT64`.
+3.  Calculate the total number of applications in this segment.
+4.  Calculate the number of rejected applications in this segment.
+5.  Calculate the rejection rate.
+6.  Group by `SCORECARD_MODEL_DESCRIPTION_BRE__c` to list rejection reasons for these cases.{
+  ""thought_process"": ""Metric: Rejection Rate and Reasons. Scenario A (Sourcing) for date logic, using `LastModifiedDate`. Date filter for October 2025. Filter by CIBIL score range (300-650), requiring `SAFE_CAST` for `CIBIL_SCORE`. Rejection status is defined by `BRE_Sanction_Result__c`. The 'reason of rejections' is mapped to `SCORECARD_MODEL_DESCRIPTION_BRE__c` as it's the most relevant descriptive field in the schema for such information."",
+  ""column_mapping"": {
+    ""CIBIL Score"": ""CIBIL_SCORE"",
+    ""Rejection Status"": ""BRE_Sanction_Result__c"",
+    ""Rejection Reason"": ""SCORECARD_MODEL_DESCRIPTION_BRE__c"",
+    ""Application Date"": ""LastModifiedDate""
+  },
+  ""sql"": ""SELECT\n    SCORECARD_MODEL_DESCRIPTION_BRE__c AS rejection_reason,\n    COUNT(*) AS total_applications_in_segment,\n    COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END) AS rejected_applications,\n    ROUND(SAFE_DIVIDE(COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END), COUNT(*)) * 100, 2) AS rejection_rate_pct\nFROM\n    `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`\nWHERE\n    DATE(LastModifiedDate) >= '2025-10-01'\n    AND DATE(LastModifiedDate) < '2025-11-01'\n    AND SAFE_CAST(CIBIL_SCORE AS INT64) BETWEEN 300 AND 650\nGROUP BY\n    rejection_reason\nORDER BY\n    rejected_applications DESC;""
+}",No thought process returned.,[],"400 Syntax error: Unexpected identifier ""thought_process"" at [1:1]; reason: invalidQuery, location: query, message: Syntax error: Unexpected identifier ""thought_process"" at [1:1]
+
+Location: US
+Job ID: 21d46315-1575-4042-8e4a-5bbf24f5d626
+"
+97f8f1,8,2025-12-01 21:32:35.127157+00:00,9,Which state has the highest roll forward rate for the current month in DPD BKT 2?,Collections,COLLECTIONS,PASS,LLM: The candidate data correctly identifies the state with the highest roll forward rate and all corresponding values match the reference data.,0.68,0,0,"SELECT
+  STATE,
+  COUNT(DISTINCT CASE WHEN (
+    DPD_BUCKET - SOM_DPD_BUCKET
+  ) > 0 THEN AGREEMENTNO END) AS roll_forward_count,
+  COUNT(DISTINCT AGREEMENTNO) AS total_bucket_2_count,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN (
+        DPD_BUCKET - SOM_DPD_BUCKET
+      ) > 0 THEN AGREEMENTNO END),
+      COUNT(DISTINCT AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS roll_forward_rate
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+WHERE
+  BUSINESS_DATE = (
+    SELECT
+      MAX(BUSINESS_DATE)
+    FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+  )
+  AND SOM_DPD_BUCKET = 2
+  AND NPASTAGEID = 'REGULAR'
+  AND POS > 0
+GROUP BY
+  STATE
+ORDER BY
+  roll_forward_rate DESC
+LIMIT 1","Metric: Roll Forward Rate (DPD_BUCKET > SOM_DPD_BUCKET). Population: SOM_DPD_BUCKET = 2. Scenario 3 (Standard Portfolio Performance) applies, so filter `POS > 0 AND NPASTAGEID = 'REGULAR'`. Time: Current month, so filter `BUSINESS_DATE = (SELECT MAX(BUSINESS_DATE) FROM ...)`. Group by STATE and order by roll forward rate descending to find the highest.","['Roll Forward Rate: DPD_BUCKET, SOM_DPD_BUCKET', 'State: STATE', 'Current Month: BUSINESS_DATE']",
+97f8f1,8,2025-12-01 21:32:51.524564+00:00,10,Analyze the portfolio risk by Ticket Size: Amount Finance and show the 90+ DPD POS % for each? highest first.,Collections,COLLECTIONS,PASS,"LLM: The candidate data correctly identifies the requested dimension (Ticket Size) and metric (90+ DPD POS %), and the values are an exact match to the reference data. The results are also correctly sorted in descending order as requested.",0.89,0,0,"SELECT
+  AMTFIN_BAND,
+  ROUND(SAFE_DIVIDE(SUM(NR_90_PLUS), SUM(POS)) * 100, 2) AS ninety_plus_dpd_pos_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+WHERE
+  BUSINESS_DATE = (
+    SELECT
+      MAX(BUSINESS_DATE)
+    FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+  )
+  AND POS > 0
+GROUP BY
+  1
+ORDER BY
+  ninety_plus_dpd_pos_percentage DESC",Metric: 90+ DPD POS %. User explicitly asks for '90+ DPD'. CRITICAL: I MUST use the pre-calculated column `NR_90_PLUS` (numerator) and `POS` (denominator). I must NOT try to calculate this using DPD_BUCKET filters. Scenario 2 (Risk) applies (filter POS > 0 only). Grouping by 'Ticket Size: Amount Finance' which maps to `AMTFIN_BAND`. Time: Current snapshot (MAX BUSINESS_DATE). Order by percentage highest first.,"['Ticket Size: AMTFIN_BAND', '90+ DPD Risk: NR_90_PLUS / POS']",
+97f8f1,9,2025-12-01 21:33:14.683523+00:00,1,what is the current 0+ performance for dealer categories?,Collections,COLLECTIONS,PASS,LLM: The candidate data is a perfect match to the reference data. All rows and values are identical. The difference in column order is ignored per the evaluation criteria.,0.81,0,0,"SELECT
+  Supplier_Categorization__Credit_Team,
+  COUNT(DISTINCT CASE WHEN DPD > 0 THEN AGREEMENTNO END) AS col_0_plus_dpd_accounts,
+  COUNT(DISTINCT AGREEMENTNO) AS total_accounts,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN DPD > 0 THEN AGREEMENTNO END),
+      COUNT(DISTINCT AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS col_0_plus_dpd_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+WHERE
+  BUSINESS_DATE = (
+    SELECT
+      MAX(BUSINESS_DATE)
+    FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+  )
+  AND POS > 0
+  AND NPASTAGEID = 'REGULAR'
+GROUP BY
+  Supplier_Categorization__Credit_Team
+ORDER BY
+  col_0_plus_dpd_percentage DESC","Metric: 0+ DPD (DPD > 0). Grouping: Dealer Categories (Supplier_Categorization__Credit_Team). Time: Current (MAX BUSINESS_DATE). Scenario 3 (Standard Portfolio Performance) applies, so filter: POS > 0 AND NPASTAGEID = 'REGULAR'.","['0+ Performance: DPD', 'Dealer Categories: Supplier_Categorization__Credit_Team']",
+97f8f1,9,2025-12-01 21:33:23.172264+00:00,2,what are the last 3 months disbursals where datasutram model score is more than 500?,Sourcing,SOURCING,ERROR,SQL Error: 400 Syntax error: Expected end,0.36,3242,453,"select the count of disbursals and filter by the date and score condition.
+I will also add a `LIMIT 10` as it's not an aggregation by a specific dimension.{
+  ""thought_process"": ""The user is asking for 'disbursals', which falls under Scenario B, requiring `DISBURSALDATE` and `DISBURSALDATE IS NOT NULL`. The time frame is 'last 3 months'. A specific filter is applied: 'datasutram model score is more than 500'. As per instructions, `Datasutram_score__c` must be `SAFE_CAST` to `INT64` for numeric comparison. The query will count the number of such disbursals."",
+  ""column_mapping"": {
+    ""Disbursal Date"": ""DISBURSALDATE"",
+    ""Datasutram Model Score"": ""Datasutram_score__c""
+  },
+  ""sql"": ""SELECT COUNT(*) AS total_disbursals FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25` WHERE DISBURSALDATE >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH) AND DISBURSALDATE IS NOT NULL AND SAFE_CAST(Datasutram_score__c AS INT64) > 500""
+}",No thought process returned.,[],"400 Syntax error: Expected end of input but got keyword OF at [1:18]; reason: invalidQuery, location: query, message: Syntax error: Expected end of input but got keyword OF at [1:18]
+
+Location: US
+Job ID: e8d363a3-2912-4533-a963-3938bee369da
+"
+97f8f1,9,2025-12-01 21:33:28.844590+00:00,3,what is the percentage of disbursed cases for last 3 months month on month out of total disbursed for final_application_scorecard model category BH_BKNH_PH? ,Sourcing,SOURCING,ERROR,SQL Error: 400 Syntax error: Unexpected i,0.34,3254,696,"thought_process
+The user is asking for the percentage of disbursed cases month-on-month for a specific `FINAL_APPLICANT_SCORECARD_MODEL_BRE` category (`BH_BKNH_PH`).
+This is a disbursal-related metric, so I will use `DISBURSALDATE` and filter for `DISBURSALDATE IS NOT NULL`.
+The time window is ""last 3 months month on month"", which means I need to group by month and filter for the last 3 full months.
+The specific model category is `BH_BKNH_PH`.
+
+Steps:
+1.  Filter for disbursed cases (`DISBURSALDATE IS NOT NULL`).
+2.  Filter for the last 3 months based on `DISBURSALDATE`.
+3.  Filter for `FINAL_APPLICANT_SCORECARD_MODEL_BRE = 'BH_BKNH_PH'`.
+4.  Calculate the count of disbursed cases for the specified model category per month.
+5.  Calculate the total disbursed cases per month.
+6.  Calculate the percentage of the specified model category out of the total disbursed cases for each month.
+7.  Order by month.{
+  ""thought_process"": ""Metric: Percentage of disbursed cases for a specific scorecard model category ('BH_BKNH_PH') out of total disbursed cases, month-on-month. Scenario B (Disbursal) is applicable, so using `DISBURSALDATE` and filtering for `DISBURSALDATE IS NOT NULL`. The time window is 'last 3 months month on month', meaning we need to group by month and filter for the last 3 full months."",
+  ""column_mapping"": {
+    ""Disbursed Cases"": ""DISBURSALDATE IS NOT NULL"",
+    ""Final Applicant Scorecard Model Category"": ""FINAL_APPLICANT_SCORECARD_MODEL_BRE"",
+    ""Disbursal Date"": ""DISBURSALDATE""
+  },
+  ""sql"": ""SELECT\n    DATE_TRUNC(DISBURSALDATE, MONTH) AS disbursal_month,\n    COUNT(CASE WHEN FINAL_APPLICANT_SCORECARD_MODEL_BRE = 'BH_BKNH_PH' THEN 1 END) AS bh_bknh_ph_disbursed_count,\n    COUNT(*) AS total_disbursed_count,\n    ROUND(SAFE_DIVIDE(\n        COUNT(CASE WHEN FINAL_APPLICANT_SCORECARD_MODEL_BRE = 'BH_BKNH_PH' THEN 1 END),\n        COUNT(*)\n    ) * 100, 2) AS percentage_bh_bknh_ph\nFROM\n    `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`\nWHERE\n    DISBURSALDATE IS NOT NULL\n    AND DISBURSALDATE >= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH), MONTH)\n    AND DISBURSALDATE < DATE_TRUNC(CURRENT_DATE(), MONTH)\nGROUP BY\n    disbursal_month\nORDER BY\n    disbursal_month;""
+}",No thought process returned.,[],"400 Syntax error: Unexpected identifier ""thought_process"" at [1:1]; reason: invalidQuery, location: query, message: Syntax error: Unexpected identifier ""thought_process"" at [1:1]
+
+Location: US
+Job ID: 0ea48804-674a-40a5-8ed6-e7198ac968a5
+"
+97f8f1,9,2025-12-01 21:33:42.759137+00:00,4,what are the percentage of last 3 months disbursals in S10 category of CRIF Index?,Sourcing,SOURCING,FAIL,"LLM: The candidate's calculated percentage (0) is significantly different from the reference value (12.77), exceeding the allowed 1% numeric tolerance. [Data_Mismatch]",1.04,3240,258,"SELECT
+  ROUND(
+    SAFE_DIVIDE(COUNT(CASE WHEN CRIF_SCORE_BAND = 'S10' THEN 1 END), COUNT(*)) * 100,
+    2
+  ) AS percentage_disbursals_in_s10
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`
+WHERE
+  DISBURSALDATE >= DATE_SUB(CURRENT_DATE, INTERVAL '3' MONTH)
+  AND NOT DISBURSALDATE IS NULL","Metric: Percentage of disbursals in a specific CRIF score band. Scenario B (Disbursals) is triggered by 'disbursals'. Date field: DISBURSALDATE, filtered for NOT NULL and last 3 months. Dimension: CRIF_SCORE_BAND. Calculation involves counting disbursals within the 'S10' band and dividing by total disbursals for the period.","['Disbursal Date: DISBURSALDATE', 'CRIF Score Band: CRIF_SCORE_BAND']",
+97f8f1,9,2025-12-01 21:33:59.399313+00:00,5,What is GNS4 trend for last 4 months?,Collections,COLLECTIONS,PASS,LLM: The candidate data contains the exact same rows and values as the reference data. The difference in row order is acceptable as the user's question did not explicitly request a specific sort order.,0.94,0,0,"WITH max_business_date AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_date
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  DATE_TRUNC(t1.BUSINESS_DATE, MONTH) AS month,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN t1.Bounce_Flag = 'Y' THEN t1.AGREEMENTNO END),
+      COUNT(DISTINCT t1.AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS gns4_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t1
+CROSS JOIN max_business_date AS t2
+WHERE
+  t1.BUSINESS_DATE >= DATE_SUB(t2.max_date, INTERVAL '4' MONTH)
+  AND t1.MOB_ON_INSTL_START_DATE = 4
+  AND t1.SOM_NPASTAGEID = 'REGULAR'
+  AND t1.SOM_POS > 0
+GROUP BY
+  1
+ORDER BY
+  1 DESC",Metric: GNS4 Rate (Bounce='Y' at MOB 4). Scenario 1 (Bounce Analysis) applies. Logic: Filter MOB_ON_INSTL_START_DATE = 4 AND Bounce_Flag = 'Y'. Exclusions: SOM_NPASTAGEID = 'REGULAR' and SOM_POS > 0. Time: Last 4 months relative to MAX date.,"['GNS4: Bounce_Flag, MOB_ON_INSTL_START_DATE', 'Time: BUSINESS_DATE']",
+97f8f1,9,2025-12-01 21:34:20.499096+00:00,6,Show me the top 10 dealers where banking model has highest no hit percentage? application count should be greater than 30 and what is the approval percentage?,Sourcing,SOURCING,PASS,"LLM: The candidate data is a perfect match to the reference data. It correctly identifies the top 10 dealers, applies the filter condition, and presents all data points and calculations accurately and in the correct descending order based on the 'no hit' percentage.",1.46,3251,564,"SELECT
+  Dealer_Name_Supplier__c AS dealer_name,
+  COUNT(*) AS total_applications,
+  COUNT(
+    CASE
+      WHEN NOT (
+        FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%'
+        OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%'
+      )
+      THEN 1
+    END
+  ) AS banking_no_hits,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(
+        CASE
+          WHEN NOT (
+            FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%'
+            OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%'
+          )
+          THEN 1
+        END
+      ),
+      COUNT(*)
+    ) * 100,
+    2
+  ) AS banking_no_hit_percentage,
+  COUNT(CASE WHEN BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction') THEN 1 END) AS approved_applications,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(CASE WHEN BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction') THEN 1 END),
+      COUNT(*)
+    ) * 100,
+    2
+  ) AS approval_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`
+WHERE
+  DATE(LastModifiedDate) >= DATE_SUB(CURRENT_DATE, INTERVAL '3' MONTH)
+GROUP BY
+  dealer_name
+HAVING
+  total_applications > 30
+ORDER BY
+  banking_no_hit_percentage DESC
+LIMIT 10","The user is asking for the top 10 dealers based on the 'banking model no hit percentage' and also wants the approval percentage. This involves calculating total applications, banking hits, banking no-hits, and approved applications. The request is about 'applications' and 'approval percentage', so it falls under Scenario A (Sourcing) and uses `LastModifiedDate`. No specific date range was mentioned, so the default 'Last 3 Months' is applied. A filter for application count > 30 is also applied.","['Dealer Name: Dealer_Name_Supplier__c', ""Banking Hit Status: FINAL_APPLICANT_SCORECARD_MODEL_BRE (LIKE '%_BKH%' OR LIKE '%_BKR%')"", 'Approval Status: BRE_Sanction_Result__c', 'Application Date: LastModifiedDate']",
+97f8f1,9,2025-12-01 21:34:27.312333+00:00,7,What is the rejection based on CIBIL score below 650 in the last 3 months? Month on month?,Sourcing,COLLECTIONS,ERROR,SQL Error: No SQL Generated,0.0,0,0,,,[],No SQL Generated
+97f8f1,9,2025-12-01 21:34:33.436025+00:00,8,What is the rejection rate for applications where CIBIL score is between 300-650 in October 2025? Also list out the reason of rejections for these cases.,Sourcing,SOURCING,ERROR,SQL Error: 400 Syntax error: Unexpected i,0.37,3260,797,"thought_process
+The user is asking for the rejection rate and reasons for applications with a specific CIBIL score range in a given month.
+This falls under Scenario A (Sourcing, Approvals, Rejections, Volume) for date logic, so `LastModifiedDate` will be used.
+The CIBIL score range is 300-650, which maps to `CIBIL_SCORE`. This column is a STRING, so it needs `SAFE_CAST` to `INT64` for numeric comparison.
+Rejection status is defined by `BRE_Sanction_Result__c IN ('REJECT', 'Reject')`.
+The rejection reason is not explicitly available as a single column in the provided schema. I will assume the user is asking for the `SCORECARD_MODEL_DESCRIPTION_BRE__c` or similar descriptive field that might contain rejection reasons. Given the schema, `SCORECARD_MODEL_DESCRIPTION_BRE__c` seems like the most appropriate field for ""reason of rejections"".
+
+Steps:
+1.  Filter by `LastModifiedDate` for October 2025.
+2.  Filter by `CIBIL_SCORE` between 300 and 650 (inclusive), casting `CIBIL_SCORE` to `INT64`.
+3.  Calculate the total number of applications in this segment.
+4.  Calculate the number of rejected applications in this segment.
+5.  Calculate the rejection rate.
+6.  Group by `SCORECARD_MODEL_DESCRIPTION_BRE__c` to list rejection reasons for these cases.{
+  ""thought_process"": ""Metric: Rejection Rate and Reasons. Scenario A (Sourcing) for date logic, using `LastModifiedDate`. Date filter for October 2025. Filter by CIBIL score range (300-650), requiring `SAFE_CAST` for `CIBIL_SCORE`. Rejection status is defined by `BRE_Sanction_Result__c`. The 'reason of rejections' is mapped to `SCORECARD_MODEL_DESCRIPTION_BRE__c` as it's the most relevant descriptive field in the schema for such information."",
+  ""column_mapping"": {
+    ""CIBIL Score"": ""CIBIL_SCORE"",
+    ""Rejection Status"": ""BRE_Sanction_Result__c"",
+    ""Rejection Reason"": ""SCORECARD_MODEL_DESCRIPTION_BRE__c"",
+    ""Application Date"": ""LastModifiedDate""
+  },
+  ""sql"": ""SELECT\n    SCORECARD_MODEL_DESCRIPTION_BRE__c AS rejection_reason,\n    COUNT(*) AS total_applications_in_segment,\n    COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END) AS rejected_applications,\n    ROUND(SAFE_DIVIDE(COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END), COUNT(*)) * 100, 2) AS rejection_rate_pct\nFROM\n    `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`\nWHERE\n    DATE(LastModifiedDate) >= '2025-10-01'\n    AND DATE(LastModifiedDate) < '2025-11-01'\n    AND SAFE_CAST(CIBIL_SCORE AS INT64) BETWEEN 300 AND 650\nGROUP BY\n    rejection_reason\nORDER BY\n    rejected_applications DESC;""
+}",No thought process returned.,[],"400 Syntax error: Unexpected identifier ""thought_process"" at [1:1]; reason: invalidQuery, location: query, message: Syntax error: Unexpected identifier ""thought_process"" at [1:1]
+
+Location: US
+Job ID: 39c26313-46ab-450c-8dd2-e65a87df0d7c
+"
+97f8f1,9,2025-12-01 21:34:48.849793+00:00,9,Which state has the highest roll forward rate for the current month in DPD BKT 2?,Collections,COLLECTIONS,PASS,"LLM: The candidate data correctly identifies the state with the highest roll forward rate, and all corresponding values for roll count, total accounts, and the rate itself are identical to the reference data.",1.12,0,0,"SELECT
+  STATE,
+  COUNT(DISTINCT CASE WHEN (
+    DPD_BUCKET - SOM_DPD_BUCKET
+  ) > 0 THEN AGREEMENTNO END) AS roll_forward_count,
+  COUNT(DISTINCT AGREEMENTNO) AS total_bucket_2_count,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN (
+        DPD_BUCKET - SOM_DPD_BUCKET
+      ) > 0 THEN AGREEMENTNO END),
+      COUNT(DISTINCT AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS roll_forward_rate
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+WHERE
+  BUSINESS_DATE = (
+    SELECT
+      MAX(BUSINESS_DATE)
+    FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+  )
+  AND SOM_DPD_BUCKET = 2
+  AND NPASTAGEID = 'REGULAR'
+  AND POS > 0
+GROUP BY
+  STATE
+ORDER BY
+  roll_forward_rate DESC
+LIMIT 1","Metric: Roll Forward Rate (DPD_BUCKET > SOM_DPD_BUCKET). Population: SOM_DPD_BUCKET = 2. Scenario 3 (Standard Portfolio Performance) applies, so filter `POS > 0 AND NPASTAGEID = 'REGULAR'`. Time: Current month, so filter `BUSINESS_DATE = (SELECT MAX(BUSINESS_DATE) FROM ...)`. Group by STATE and order by roll forward rate descending to find the highest.","['Roll Forward Rate: DPD_BUCKET, SOM_DPD_BUCKET', 'State: STATE', 'Current Month: BUSINESS_DATE']",
+97f8f1,9,2025-12-01 21:35:06.044271+00:00,10,Analyze the portfolio risk by Ticket Size: Amount Finance and show the 90+ DPD POS % for each? highest first.,Collections,COLLECTIONS,PASS,LLM: The candidate data correctly identifies the ticket size bands and their corresponding 90+ DPD POS percentages. The data is accurately sorted from highest to lowest risk as requested.,0.71,0,0,"SELECT
+  AMTFIN_BAND,
+  ROUND(SAFE_DIVIDE(SUM(NR_90_PLUS), SUM(POS)) * 100, 2) AS ninety_plus_dpd_pos_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+WHERE
+  BUSINESS_DATE = (
+    SELECT
+      MAX(BUSINESS_DATE)
+    FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+  )
+  AND POS > 0
+GROUP BY
+  1
+ORDER BY
+  ninety_plus_dpd_pos_percentage DESC",Metric: 90+ DPD POS %. User explicitly asks for '90+ DPD'. CRITICAL: I MUST use the pre-calculated column `NR_90_PLUS` (numerator) and `POS` (denominator). I must NOT try to calculate this using DPD_BUCKET filters. Scenario 2 (Risk) applies (filter POS > 0 only). Grouping by 'Ticket Size: Amount Finance' which maps to `AMTFIN_BAND`. Time: Current snapshot (MAX BUSINESS_DATE). Order by percentage highest first.,"['Ticket Size: AMTFIN_BAND', '90+ DPD Risk: NR_90_PLUS / POS']",
+97f8f1,10,2025-12-01 21:35:27.023198+00:00,1,what is the current 0+ performance for dealer categories?,Collections,COLLECTIONS,PASS,LLM: The candidate data is a perfect match to the reference data. All rows and values are identical. The difference in column order is ignored per the evaluation criteria.,0.65,0,0,"SELECT
+  Supplier_Categorization__Credit_Team,
+  COUNT(DISTINCT CASE WHEN DPD > 0 THEN AGREEMENTNO END) AS col_0_plus_dpd_accounts,
+  COUNT(DISTINCT AGREEMENTNO) AS total_accounts,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN DPD > 0 THEN AGREEMENTNO END),
+      COUNT(DISTINCT AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS col_0_plus_dpd_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+WHERE
+  BUSINESS_DATE = (
+    SELECT
+      MAX(BUSINESS_DATE)
+    FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+  )
+  AND POS > 0
+  AND NPASTAGEID = 'REGULAR'
+GROUP BY
+  Supplier_Categorization__Credit_Team
+ORDER BY
+  col_0_plus_dpd_percentage DESC","Metric: 0+ DPD (DPD > 0). Grouping: Dealer Categories (Supplier_Categorization__Credit_Team). Time: Current (MAX BUSINESS_DATE). Scenario 3 (Standard Portfolio Performance) applies, so filter: POS > 0 AND NPASTAGEID = 'REGULAR'.","['0+ Performance: DPD', 'Dealer Categories: Supplier_Categorization__Credit_Team']",
+97f8f1,10,2025-12-01 21:35:35.826519+00:00,2,what are the last 3 months disbursals where datasutram model score is more than 500?,Sourcing,SOURCING,ERROR,SQL Error: 400 Syntax error: Expected end,0.37,3242,453,"select the count of disbursals and filter by the date and score condition.
+I will also add a `LIMIT 10` as it's not an aggregation by a specific dimension.{
+  ""thought_process"": ""The user is asking for 'disbursals', which falls under Scenario B, requiring `DISBURSALDATE` and `DISBURSALDATE IS NOT NULL`. The time frame is 'last 3 months'. A specific filter is applied: 'datasutram model score is more than 500'. As per instructions, `Datasutram_score__c` must be `SAFE_CAST` to `INT64` for numeric comparison. The query will count the number of such disbursals."",
+  ""column_mapping"": {
+    ""Disbursal Date"": ""DISBURSALDATE"",
+    ""Datasutram Model Score"": ""Datasutram_score__c""
+  },
+  ""sql"": ""SELECT COUNT(*) AS total_disbursals FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25` WHERE DISBURSALDATE >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH) AND DISBURSALDATE IS NOT NULL AND SAFE_CAST(Datasutram_score__c AS INT64) > 500""
+}",No thought process returned.,[],"400 Syntax error: Expected end of input but got keyword OF at [1:18]; reason: invalidQuery, location: query, message: Syntax error: Expected end of input but got keyword OF at [1:18]
+
+Location: US
+Job ID: fc54d5c8-0a12-4845-963b-890fbee911d7
+"
+97f8f1,10,2025-12-01 21:35:41.860663+00:00,3,what is the percentage of disbursed cases for last 3 months month on month out of total disbursed for final_application_scorecard model category BH_BKNH_PH? ,Sourcing,SOURCING,ERROR,SQL Error: 400 Syntax error: Unexpected i,0.32,3254,696,"thought_process
+The user is asking for the percentage of disbursed cases month-on-month for a specific `FINAL_APPLICANT_SCORECARD_MODEL_BRE` category (`BH_BKNH_PH`).
+This is a disbursal-related metric, so I will use `DISBURSALDATE` and filter for `DISBURSALDATE IS NOT NULL`.
+The time window is ""last 3 months month on month"", which means I need to group by month and filter for the last 3 full months.
+The specific model category is `BH_BKNH_PH`.
+
+Steps:
+1.  Filter for disbursed cases (`DISBURSALDATE IS NOT NULL`).
+2.  Filter for the last 3 months based on `DISBURSALDATE`.
+3.  Filter for `FINAL_APPLICANT_SCORECARD_MODEL_BRE = 'BH_BKNH_PH'`.
+4.  Calculate the count of disbursed cases for the specified model category per month.
+5.  Calculate the total disbursed cases per month.
+6.  Calculate the percentage of the specified model category out of the total disbursed cases for each month.
+7.  Order by month.{
+  ""thought_process"": ""Metric: Percentage of disbursed cases for a specific scorecard model category ('BH_BKNH_PH') out of total disbursed cases, month-on-month. Scenario B (Disbursal) is applicable, so using `DISBURSALDATE` and filtering for `DISBURSALDATE IS NOT NULL`. The time window is 'last 3 months month on month', meaning we need to group by month and filter for the last 3 full months."",
+  ""column_mapping"": {
+    ""Disbursed Cases"": ""DISBURSALDATE IS NOT NULL"",
+    ""Final Applicant Scorecard Model Category"": ""FINAL_APPLICANT_SCORECARD_MODEL_BRE"",
+    ""Disbursal Date"": ""DISBURSALDATE""
+  },
+  ""sql"": ""SELECT\n    DATE_TRUNC(DISBURSALDATE, MONTH) AS disbursal_month,\n    COUNT(CASE WHEN FINAL_APPLICANT_SCORECARD_MODEL_BRE = 'BH_BKNH_PH' THEN 1 END) AS bh_bknh_ph_disbursed_count,\n    COUNT(*) AS total_disbursed_count,\n    ROUND(SAFE_DIVIDE(\n        COUNT(CASE WHEN FINAL_APPLICANT_SCORECARD_MODEL_BRE = 'BH_BKNH_PH' THEN 1 END),\n        COUNT(*)\n    ) * 100, 2) AS percentage_bh_bknh_ph\nFROM\n    `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`\nWHERE\n    DISBURSALDATE IS NOT NULL\n    AND DISBURSALDATE >= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH), MONTH)\n    AND DISBURSALDATE < DATE_TRUNC(CURRENT_DATE(), MONTH)\nGROUP BY\n    disbursal_month\nORDER BY\n    disbursal_month;""
+}",No thought process returned.,[],"400 Syntax error: Unexpected identifier ""thought_process"" at [1:1]; reason: invalidQuery, location: query, message: Syntax error: Unexpected identifier ""thought_process"" at [1:1]
+
+Location: US
+Job ID: 7114b080-82ae-41a0-a9af-dfa769f375b6
+"
+97f8f1,10,2025-12-01 21:35:55.925671+00:00,4,what are the percentage of last 3 months disbursals in S10 category of CRIF Index?,Sourcing,SOURCING,FAIL,LLM: The candidate's calculated percentage of 0 is incorrect. The reference value is 12.77. The difference is significant and exceeds the 1% numeric tolerance. [Data_Mismatch],0.97,3240,258,"SELECT
+  ROUND(
+    SAFE_DIVIDE(COUNT(CASE WHEN CRIF_SCORE_BAND = 'S10' THEN 1 END), COUNT(*)) * 100,
+    2
+  ) AS percentage_disbursals_in_s10
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`
+WHERE
+  DISBURSALDATE >= DATE_SUB(CURRENT_DATE, INTERVAL '3' MONTH)
+  AND NOT DISBURSALDATE IS NULL","Metric: Percentage of disbursals in a specific CRIF score band. Scenario B (Disbursals) is triggered by 'disbursals'. Date field: DISBURSALDATE, filtered for NOT NULL and last 3 months. Dimension: CRIF_SCORE_BAND. Calculation involves counting disbursals within the 'S10' band and dividing by total disbursals for the period.","['Disbursal Date: DISBURSALDATE', 'CRIF Score Band: CRIF_SCORE_BAND']",
+97f8f1,10,2025-12-01 21:36:12.265680+00:00,5,What is GNS4 trend for last 4 months?,Collections,COLLECTIONS,PASS,LLM: The candidate data contains all the correct rows and values from the reference data. The difference in row order is acceptable as the user's question about a 'trend' does not mandate a specific sort order.,0.74,0,0,"WITH MaxBusinessDate AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_date
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
+  DATE_TRUNC(t1.BUSINESS_DATE, MONTH) AS month,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN t1.Bounce_Flag = 'Y' THEN t1.AGREEMENTNO END),
+      COUNT(DISTINCT t1.AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS gns4_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t1
+CROSS JOIN MaxBusinessDate AS mbd
+WHERE
+  t1.BUSINESS_DATE >= DATE_SUB(mbd.max_date, INTERVAL '4' MONTH)
+  AND t1.MOB_ON_INSTL_START_DATE = 4
+  AND t1.SOM_NPASTAGEID = 'REGULAR'
+  AND t1.SOM_POS > 0
+GROUP BY
+  1
+ORDER BY
+  1 DESC",Metric: GNS4 Rate (Bounce='Y' at MOB 4). Scenario 1 (Bounce Analysis) applies. Logic: Filter MOB_ON_INSTL_START_DATE = 4 AND Bounce_Flag = 'Y'. Exclusions: SOM_NPASTAGEID = 'REGULAR' and SOM_POS > 0. Time: Last 4 months relative to MAX date. The trend implies grouping by month.,"['GNS4: Bounce_Flag, MOB_ON_INSTL_START_DATE', 'Time: BUSINESS_DATE']",
+97f8f1,10,2025-12-01 21:36:33.726259+00:00,6,Show me the top 10 dealers where banking model has highest no hit percentage? application count should be greater than 30 and what is the approval percentage?,Sourcing,SOURCING,PASS,"LLM: The candidate data is a perfect match to the reference data. It correctly identifies the top 10 dealers, applies the filter condition, and presents all data points and calculations accurately and in the correct descending order based on the 'no hit' percentage.",1.16,3251,564,"SELECT
+  Dealer_Name_Supplier__c AS dealer_name,
+  COUNT(*) AS total_applications,
+  COUNT(
+    CASE
+      WHEN NOT (
+        FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%'
+        OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%'
+      )
+      THEN 1
+    END
+  ) AS banking_no_hits,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(
+        CASE
+          WHEN NOT (
+            FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%'
+            OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%'
+          )
+          THEN 1
+        END
+      ),
+      COUNT(*)
+    ) * 100,
+    2
+  ) AS banking_no_hit_percentage,
+  COUNT(CASE WHEN BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction') THEN 1 END) AS approved_applications,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(CASE WHEN BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction') THEN 1 END),
+      COUNT(*)
+    ) * 100,
+    2
+  ) AS approval_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`
+WHERE
+  DATE(LastModifiedDate) >= DATE_SUB(CURRENT_DATE, INTERVAL '3' MONTH)
+GROUP BY
+  dealer_name
+HAVING
+  total_applications > 30
+ORDER BY
+  banking_no_hit_percentage DESC
+LIMIT 10","The user is asking for the top 10 dealers based on the 'banking model no hit percentage' and also wants the approval percentage. This involves calculating total applications, banking hits, banking no-hits, and approved applications. The request is about 'applications' and 'approval percentage', so it falls under Scenario A (Sourcing) and uses `LastModifiedDate`. No specific date range was mentioned, so the default 'Last 3 Months' is applied. A filter for application count > 30 is also applied.","['Dealer Name: Dealer_Name_Supplier__c', ""Banking Hit Status: FINAL_APPLICANT_SCORECARD_MODEL_BRE (LIKE '%_BKH%' OR LIKE '%_BKR%')"", 'Approval Status: BRE_Sanction_Result__c', 'Application Date: LastModifiedDate']",
+97f8f1,10,2025-12-01 21:36:51.259507+00:00,7,What is the rejection based on CIBIL score below 650 in the last 3 months? Month on month?,Sourcing,SOURCING,PASS,"LLM: The candidate data correctly provides the number of rejected applications for each of the three months, matching the reference data exactly. Although the reference data contains additional columns (total applications and rejection rate), the candidate data accurately answers the specific question asked by the user.",1.15,3244,358,"SELECT
+  DATE_TRUNC(DATE(LastModifiedDate), MONTH) AS month,
+  COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END) AS rejected_applications
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`
+WHERE
+  DATE(LastModifiedDate) >= DATE_SUB(CURRENT_DATE, INTERVAL '3' MONTH)
+  AND SAFE_CAST(CIBIL_SCORE AS INT64) < 650
+GROUP BY
+  1
+ORDER BY
+  1","The user is asking for rejection data, which falls under Scenario A (Sourcing). The date field to use is `LastModifiedDate`, and it needs to be wrapped in `DATE()`. The time window is 'last 3 months', and the output should be 'month on month', so we'll group by month. The filter is 'CIBIL score below 650'. `CIBIL_SCORE` is a STRING and needs to be `SAFE_CAST` to `INT64` for numeric comparison. Rejection is defined by `BRE_Sanction_Result__c IN ('REJECT', 'Reject')`.","['Rejection Status: BRE_Sanction_Result__c', 'CIBIL Score: CIBIL_SCORE', 'Application Date: LastModifiedDate']",
+97f8f1,10,2025-12-01 21:37:02.571277+00:00,8,What is the rejection rate for applications where CIBIL score is between 300-650 in October 2025? Also list out the reason of rejections for these cases.,Sourcing,SOURCING,ERROR,SQL Error: 400 Unrecognized name: REJECTI,0.5,3260,452,"SELECT
+  COUNT(*) AS total_applications,
+  COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END) AS rejected_applications,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END),
+      COUNT(*)
+    ) * 100,
+    2
+  ) AS rejection_rate_pct,
+  ARRAY_AGG(
+    STRUCT(REJECTION_REASON__c, COUNT(1) AS reason_count) IGNORE NULLS ORDER BY COUNT(1) DESC
+    LIMIT 5
+  ) AS top_rejection_reasons
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`
+WHERE
+  DATE(LastModifiedDate) >= '2025-10-01'
+  AND DATE(LastModifiedDate) < '2025-11-01'
+  AND SAFE_CAST(CIBIL_SCORE AS INT64) BETWEEN 300 AND 650","The user is asking for the rejection rate and specific rejection reasons for applications within a defined CIBIL score range and a specific month. This falls under Scenario A (Sourcing, Approvals, Rejections), so `LastModifiedDate` is used for date filtering. The CIBIL score is a STRING and needs `SAFE_CAST` to INT64 for numeric comparison. The query calculates the overall rejection rate and then uses `ARRAY_AGG` to list the top 5 rejection reasons for the rejected applications within the specified criteria.","['CIBIL score: CIBIL_SCORE', 'Rejection Status: BRE_Sanction_Result__c', 'Rejection Reason: REJECTION_REASON__c', 'Application Date: LastModifiedDate']","400 Unrecognized name: REJECTION_REASON__c at [12:12]; reason: invalidQuery, location: query, message: Unrecognized name: REJECTION_REASON__c at [12:12]
+
+Location: asia-south1
+Job ID: 821be718-3414-4a42-875d-e03d14eb2c8b
+"
+97f8f1,10,2025-12-01 21:37:16.717100+00:00,9,Which state has the highest roll forward rate for the current month in DPD BKT 2?,Collections,COLLECTIONS,PASS,"LLM: The candidate data correctly identifies the state with the highest roll forward rate, and all corresponding values match the reference data exactly.",0.74,0,0,"SELECT
+  STATE,
+  COUNT(DISTINCT CASE WHEN DPD_BUCKET > SOM_DPD_BUCKET THEN AGREEMENTNO END) AS roll_forward_count,
+  COUNT(DISTINCT AGREEMENTNO) AS total_bucket_2_accounts,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN DPD_BUCKET > SOM_DPD_BUCKET THEN AGREEMENTNO END),
+      COUNT(DISTINCT AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS roll_forward_rate
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+WHERE
+  BUSINESS_DATE = (
+    SELECT
+      MAX(BUSINESS_DATE)
+    FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+  )
+  AND SOM_DPD_BUCKET = 2
+  AND POS > 0
+  AND NPASTAGEID = 'REGULAR'
+GROUP BY
+  STATE
+ORDER BY
+  roll_forward_rate DESC
+LIMIT 1","Metric: Roll Forward Rate (DPD_BUCKET > SOM_DPD_BUCKET). Population: SOM_DPD_BUCKET = 2. Scenario 3 (Standard Portfolio Performance) applies, so filter by POS > 0 AND NPASTAGEID = 'REGULAR'. Time: Current month, so filter by BUSINESS_DATE = MAX(BUSINESS_DATE). Group by STATE and order by roll forward rate descending to find the highest.","['Roll Forward Rate: DPD_BUCKET, SOM_DPD_BUCKET', 'DPD Bucket: SOM_DPD_BUCKET', 'State: STATE', 'Current Month: BUSINESS_DATE']",
+97f8f1,10,2025-12-01 21:37:32.426129+00:00,10,Analyze the portfolio risk by Ticket Size: Amount Finance and show the 90+ DPD POS % for each? highest first.,Collections,COLLECTIONS,PASS,"LLM: The candidate data correctly identifies the requested dimension (Ticket Size) and metric (90+ DPD POS %), and the values are an exact match to the reference data. The results are also correctly sorted in descending order as requested.",0.7,0,0,"SELECT
+  AMTFIN_BAND,
+  ROUND(SAFE_DIVIDE(SUM(NR_90_PLUS), SUM(POS)) * 100, 2) AS ninety_plus_dpd_pos_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+WHERE
+  BUSINESS_DATE = (
+    SELECT
+      MAX(BUSINESS_DATE)
+    FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+  )
+  AND POS > 0
+GROUP BY
+  1
+ORDER BY
+  ninety_plus_dpd_pos_percentage DESC",Metric: 90+ DPD POS %. User explicitly asks for '90+ DPD'. CRITICAL: I MUST use the pre-calculated column `NR_90_PLUS` (numerator) and `POS` (denominator). I must NOT try to calculate this using DPD_BUCKET filters. Grouping: 'Ticket Size: Amount Finance' maps to `AMTFIN_BAND`. Scenario 2 (Risk) applies (filter POS > 0 only). Time: Current snapshot (MAX BUSINESS_DATE). Ordering: Highest first.,"['Ticket Size: AMTFIN_BAND', '90+ DPD Risk: NR_90_PLUS / POS']",

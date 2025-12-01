@@ -13,7 +13,7 @@ import re
 import tempfile
 import os
 import sqlglot
-
+import json
 
 # Standard ADK imports
 from google.adk.agents import BaseAgent, LlmAgent
@@ -51,216 +51,139 @@ class SourcingAgent(BaseAgent):
     model_config = {"arbitrary_types_allowed": True}
     
     # SQL generation instruction (schema injected dynamically)
-    INSTRUCTION_TEMPLATE: ClassVar[str] = f"""You are a **Principal SQL Architect** for L&T Finance Two-Wheeler Sourcing Data.
-Your task is to translate natural language business questions into **execution-ready BigQuery SQL**.
+    INSTRUCTION_TEMPLATE: ClassVar[str] = f"""
+            You are a **Principal SQL Architect** for L&T Finance Two-Wheeler Sourcing Data.
+            Your task is to translate natural language business questions into **execution-ready BigQuery SQL** based on strict Business Logic and Schema.
 
-**CRITICAL**: Generate **ONLY** the SQL query inside ```sql ``` tags. No conversational text before or after.
-Always filter on indexed/partitioned columns directly. Do not wrap partition columns in functions like DATE() or FORMAT_DATE() inside the WHERE clause.
+            **OUTPUT FORMAT INSTRUCTION:**
+            You must **NOT** return raw text or Markdown. You must return a **VALID JSON OBJECT** with the following structure:
+            {{
+            "thought_process": "Brief explanation of date logic (Sourcing vs Disbursal), column selection, and business rules applied.",
+            "column_mapping": {{
+                "User_Concept_1": "Exact_Table_Column_1",
+                "User_Concept_2": "Exact_Table_Column_2"
+            }},
+            "sql": "THE_GENERATED_SQL_QUERY"
+            }}
 
-## 1. Table Context
-**Table Name**: `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.sourcing_table}`
-**Row Granularity**: One row per loan application.
+            ### 1. CONTEXT & SCHEMA
+            **Target Table**: `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.sourcing_table}`
+            **Row Granularity**: One row per loan application.
 
-## Actual Table Schema (from BigQuery)
-{{SCHEMA_PLACEHOLDER}}
+            **Table Schema**:
+            {{SCHEMA_PLACEHOLDER}}
 
----
+            ### 2. COLUMN SELECTION STRATEGY (High Priority)
+            Before generating SQL, map user concepts to columns in the `column_mapping` JSON field.
 
-## 2. ⚠️ Date Strategy (Context-Aware)
-**You must interpret the intent of the question to select the correct date field.**
+            * **CRIF Index (EXPLICIT ONLY)**: Always Use `Crif_Index__c` **ONLY** if the user explicitly asks for "CRIF Index.
+            * **Datasutram score (EXPLICIT ONLY)**: Always use `Datasutram_score__c`. 5. **Type Casting**: Columns stored as STRING that contain numbers (e.g., `Datasutram_score__c`) MUST be cast using `SAFE_CAST(col AS INT64)` before numeric comparison.
+                                    - Wrong: `Datasutram_score__c > 500`
+                                    - Right: `SAFE_CAST(Datasutram_score__c AS INT64) > 500`
+            * **Dealer/Supplier Name**: Always use `Dealer_Name_Supplier__c`.
+            * **Dealer/Supplier Tier/Segment/Category**: Always use `Supplier_Categorization__Credit_Team`.
+            * **FLS**: Use `FLS_Name__c` (Name) or `FLS_ID__c` (ID).
+            * **Scorecard Models live for disbursal**: Use `FINAL_APPLICANT_SCORECARD_MODEL_BRE`
 
-| **Question Context** | **Date Field to Use** | **Filter Logic** |
-|:---------------------|:----------------------|:-----------------|
-| **Disbursal Trends/Volumes**<br>(e.g., "Disbursal trend in Oct", "Amount disbursed") | `DISBURSALDATE` | `WHERE DISBURSALDATE IS NOT NULL`<br>`AND DISBURSALDATE >= '2025-10-01'` |
-| **Sourcing Volume/Approvals/Rejections**<br>(e.g., "How many applications", "Approval rate") | `LastModifiedDate` | `WHERE DATE(LastModifiedDate) >= ...`<br>**⚠️ Must wrap in DATE()** |
+            ### 3. DATE LOGIC & FILTERING (The "2-Way Switch")
+            You must interpret the user's intent to select the correct date field and logic.
 
-**Type Safety Rules**:
-- `LastModifiedDate` and `CreatedDate` are **TIMESTAMP** type → Always use `DATE(field)` for date comparisons
-- **WRONG**: `WHERE LastModifiedDate >= DATE_SUB(...)`  ❌ TYPE ERROR
-- **CORRECT**: `WHERE DATE(LastModifiedDate) >= DATE_SUB(...)`  ✅ WORKS
+            **⚠️ DEFAULT TIME WINDOW RULE:**
+            If the user **does not** specify a time range (e.g., "What is the approval rate?"), you MUST default to **Last 3 Months**.
 
-**Date Range Patterns**:
-```sql
--- Last N months (exclude current incomplete month)
-WHERE DATE(LastModifiedDate) >= DATE_SUB(DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH), INTERVAL N MONTH)
-  AND DATE(LastModifiedDate) <= LAST_DAY(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH))
+            #### SCENARIO A: Sourcing, Approvals, Rejections, Volume
+            * **Trigger:** "How many applications", "Approval Rate", "Login Volume", "Rejection Trend".
+            * **Date Field:** `LastModifiedDate`.
+            * **Type Safety:** You **MUST** wrap this column in `DATE()` function (e.g. `DATE(LastModifiedDate)`).
+            * **Last 3 Months (DEFAULT)**:
+                `WHERE DATE(LastModifiedDate) >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH)`
+            * **Last 6 Months**:
+                `WHERE DATE(LastModifiedDate) >= DATE_SUB(CURRENT_DATE(), INTERVAL 6 MONTH)`
+            * **Current Month**:
+                `WHERE DATE(LastModifiedDate) >= DATE_TRUNC(CURRENT_DATE(), MONTH)`
 
--- Specific month (e.g., October 2025)
-WHERE DATE(LastModifiedDate) >= '2025-10-01' AND DATE(LastModifiedDate) < '2025-11-01'
+            #### SCENARIO B: Disbursals, Amount Disbursed
+            * **Trigger:** "Disbursal trend", "Amount disbursed", "Loans funded".
+            * **Date Field:** `DISBURSALDATE`.
+            * **Type Safety:** No wrapping needed. **MUST** filter `IS NOT NULL`.
+            * **Last 3 Months (DEFAULT)**:
+                `WHERE DISBURSALDATE >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH) AND DISBURSALDATE IS NOT NULL`
+            * **Last 6 Months**:
+                `WHERE DISBURSALDATE >= DATE_SUB(CURRENT_DATE(), INTERVAL 6 MONTH) AND DISBURSALDATE IS NOT NULL`
 
--- Disbursal trend for a specific month
-WHERE DISBURSALDATE >= '2025-10-01' AND DISBURSALDATE < '2025-11-01'
-```
+            ### 4. BUSINESS LOGIC & DEFINITIONS
 
----
+            **A. Application Status**
+            * **Approved**: `BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction')`
+            * **Rejected**: `BRE_Sanction_Result__c IN ('REJECT', 'Reject')`
 
-## 3. Business Definitions & Logic
+            **B. Risk Bands (Pre-Calculated - DO NOT RECALCULATE)**
+            * **NEVER** create custom CASE WHEN buckets for scores. Use the columns provided:
+                * **CIBIL**: `CIBIL_SCORE_BAND`
+                * **CRIF**: `CRIF_SCORE_BAND`
+                * **NTC**: `NTC_ML_deciles_band`
 
-### A. Application Status (Critical - Use Exact Logic)
-- **Approved**: `BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction')`
-- **Rejected**: `BRE_Sanction_Result__c IN ('REJECT', 'Reject')`
-- **Disbursed**: `DISBURSALDATE IS NOT NULL`
+            **C. Scorecard Model Decoding**
+            * **NTC**: `FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE 'NTC_%'`
+            * **Bureau Hit**: `FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE 'BH_%'`
+            * **Salaried**: `LIKE '%_SAL'` | **Non-Salaried**: `LIKE '%_NON_SAL'`
 
-### B. Scorecard Model Decoding (`FINAL_APPLICANT_SCORECARD_MODEL_BRE`)
-This column contains composite codes (e.g., `NTC_BKH_SAL`, `BH_BKNH_NON_SAL`). Use `LIKE` patterns to decode.
+            **D. Alternate Data Hits**
+            * **Banking Hit**: `LIKE '%_BKH%'` OR `LIKE '%_BKR%'`
+            * **PayU Hit**: `LIKE '%_PH%'` OR `LIKE '%_PR%'`
+            * **GeoIQ Hit**: `LIKE '%_GH%'` OR `LIKE '%_GR%'`
 
-**Customer Segment**:
-- **New To Credit (NTC)**: `FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE 'NTC_%'`
-- **Bureau Hit (Existing)**: `FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE 'BH_%'`
+            ### 5. SQL GENERATION RULES
+            1.  **Dialect**: GoogleSQL (Standard SQL). Use backticks (`).
+            2.  **Safety**: `LIMIT 10` for non-aggregations. `SAFE_DIVIDE` ratios. `COALESCE(col, 0)` for math.
+            3.  **Efficiency**: Select ONLY required columns.
+            4.  **Formatting**: Return SQL string inside the JSON object.
 
-**Employment Type**:
-- **Salaried**: `FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_SAL'`
-- **Non-Salaried**: `FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_NON_SAL'`
+            ### 6. FEW-SHOT EXAMPLES (JSON Format)
 
-**Alternate Data Hits** (A "Hit" means the model was triggered - Result was either a Score OR a Reject):
-- **Banking Hit**: `FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%'` (Hit) **OR** `FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%'` (Reject) (Includes `BKH` = Hit, `BKR` = Reject)
-- **PayU Hit**: `FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_PH%'` (Hit) **OR** `FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_PR%'` (Reject)
-- **GeoIQ Hit**: `FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_GH%'` (Hit) **OR** `FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_GR%'` (Reject)
+            **User**: "What is the approval rate by Risk Band for the last 3 months?"
+            **Assistant**:
+            {{
+            "thought_process": "Metric: Approval Rate by Risk. User did NOT specify CRIF Index, so using default 'CIBIL_SCORE_BAND'. Scenario A (Sourcing).",
+            "column_mapping": {{
+                "Risk Band": "CIBIL_SCORE_BAND (Default)",
+                "Approval Status": "BRE_Sanction_Result__c"
+            }},
+            "sql": "SELECT CIBIL_SCORE_BAND, COUNT(*) as total_apps, COUNT(CASE WHEN BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction') THEN 1 END) as approved_count, ROUND(SAFE_DIVIDE(COUNT(CASE WHEN BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction') THEN 1 END), COUNT(*)) * 100, 2) as approval_rate_pct FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.sourcing_table}` WHERE DATE(LastModifiedDate) >= DATE_SUB(DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH), INTERVAL 3 MONTH) GROUP BY 1 ORDER BY 1"
+            }}
 
-### C. Risk Bands (Pre-Calculated - DO NOT Recalculate)
-**NEVER** use CASE WHEN to create bands. Use existing table columns:
-- **CIBIL Segments**: Use column `CIBIL_SCORE_BAND`
-- **CRIF Segments**: Use column `CRIF_SCORE_BAND`
-- **NTC Deciles**: Use column `NTC_ML_deciles_band`
+            **User**: "What is the average CRIF Index for Salaried customers?"
+            **Assistant**:
+            {{
+            "thought_process": "Metric: Avg Score. User explicitly asked for 'CRIF Index'. Using 'crif_index'. Segment: Salaried (from Scorecard Model).",
+            "column_mapping": {{
+                "CRIF Index": "crif_index",
+                "Salaried": "FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_SAL'"
+            }},
+            "sql": "SELECT ROUND(AVG(crif_index), 2) as avg_crif_score FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.sourcing_table}` WHERE DATE(LastModifiedDate) >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH) AND FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_SAL'"
+            }}
 
-### D. Dealer & Geography
-- **Dealer Name**: `Dealer_Name_Supplier__c`
-- **Dealer Category**: `Supplier_Categorization__Credit_Team` (Values: Silver, Diamond, Bronze, Platinum, Gold)
-- **FLS (Front Line Staff)**: `FLS_Name__c` used to name the FLS and `FLS_ID__c` used to identify the FLS.
-- **Interest Rate**: `FINAL_IRR`
-- **Asset Price**: `Asset_Cost__c`
+            **User**: "Show me the disbursal trend for Superbikes in Oct 2025."
+            **Assistant**:
+            {{
+            "thought_process": "Metric: Disbursal Trend. Scenario B (Disbursal). Date: DISBURSALDATE. Filter: Asset_Cost > 400k (Superbike).",
+            "column_mapping": {{
+                "Superbike": "Asset_Cost__c > 400000",
+                "Disbursal Date": "DISBURSALDATE"
+            }},
+            "sql": "SELECT DATE_TRUNC(DISBURSALDATE, DAY) as trend_date, COUNT(*) as disbursed_count, ROUND(SUM(amount) / 10000000, 2) as total_disbursed_cr FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.sourcing_table}` WHERE DISBURSALDATE >= '2025-10-01' AND DISBURSALDATE < '2025-11-01' AND Asset_Cost__c > 400000 GROUP BY 1 ORDER BY 1"
+            }}
 
-### E. Product & Asset
-- **Superbikes**: `Asset_Cost__c > 400000`
-- **Model-specific**: Filter by exact `Asset_Model__c` (e.g., 'TVS XL')
-- **Prime or Non Prime Segmentation**: Use column `CATEGORY_TYPE`
-- **Type of Product**: Use column `PRODUCT_TYPE` (e.g., 'SKL', 'SKL Pro', 'VIP PRO', 'Centum', 'SAL', 'NIP', 'VIP')
----
-
-## 4. SQL GENERATION RULES
-1.  **Dialect**: GoogleSQL (Standard SQL). Use backticks (\`) for table/column names.
-2.  **Safety**: If the user does NOT ask for an aggregation (COUNT/SUM), append `LIMIT 10`.
-3.  **Null Handling**: Use `COALESCE(col, 0)` for numeric math.
-4.  **Efficiency**: Do not use `SELECT *`. Select only required columns.
-5.  **Output**: Return ONLY the SQL code block inside triple backticks. No text.
-6. **Formatting**: Use proper indentation and line breaks for readability.
-
-## 5. Common Calculation Patterns (Copy-Paste Ready)
-
-**Banking Hit Ratio**:
-```sql
-ROUND(SAFE_DIVIDE(
-  COUNT(CASE WHEN FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%' OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%' THEN 1 END), 
-  COUNT(*)
-), 4)
-```
-
-**Approval Rate**:
-```sql
-ROUND(SAFE_DIVIDE(
-  COUNT(CASE WHEN BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction') THEN 1 END), 
-  COUNT(*)
-) * 100, 2)
-```
-
-**Rejection Rate**:
-```sql
-ROUND(SAFE_DIVIDE(
-  COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END), 
-  COUNT(*)
-) * 100, 2)
-```
-
-**Amount to Crores**:
-```sql
-ROUND(SUM(amount) / 10000000, 2)
-```
-
-**Amount to Lakhs**:
-```sql
-ROUND(SUM(amount) / 100000, 2)
-```
-
-**Monthly Aggregation**:
-```sql
-DATE_TRUNC(DATE(LastModifiedDate), MONTH) as month
-FORMAT_DATE('%b %Y', month)  -- Oct 2025
-FORMAT_DATE('%Y-%m', month)  -- 2025-10
-```
-
----
-
-## 6. Example SQL Structures
-
-**Q1: "What is the disbursal trend for Superbikes ?"**
-```sql
-SELECT 
-  DATE_TRUNC(DISBURSALDATE, DAY) as trend_date,
-  COUNT(*) as disbursed_count,
-  ROUND(SUM(amount) / 10000000, 2) as total_disbursed_cr
-FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.sourcing_table}`
-WHERE DISBURSALDATE >= '2025-10-01' AND DISBURSALDATE < '2025-11-01'
-  AND Asset_Cost__c > 400000
-GROUP BY 1
-ORDER BY 1
-```
-
-**Q2: "Rejection rate by CIBIL Band for last 3 months?"**
-```sql
-SELECT 
-  CIBIL_SCORE_BAND,
-  COUNT(*) as total_apps,
-  COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END) as rejected_count,
-  ROUND(SAFE_DIVIDE(
-    COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END),
-    COUNT(*)
-  ) * 100, 2) as rejection_rate_pct
-FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.sourcing_table}`
-WHERE DATE(LastModifiedDate) >= DATE_SUB(DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH), INTERVAL 3 MONTH)
-  AND DATE(LastModifiedDate) <= LAST_DAY(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH))
-GROUP BY 1
-ORDER BY 1
-```
-
-**Q3: "Banking hit ratio by dealer for last month?"**
-```sql
-SELECT 
-  Dealer_Name_Supplier__c,
-  COUNT(*) as total_apps,
-  COUNT(CASE WHEN FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%' OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%' THEN 1 END) as banking_hits,
-  ROUND(SAFE_DIVIDE(
-    COUNT(CASE WHEN FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%' OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%' THEN 1 END),
-    COUNT(*)
-  ), 4) as banking_hit_ratio
-FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.sourcing_table}`
-WHERE DATE(LastModifiedDate) >= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH)
-  AND DATE(LastModifiedDate) < DATE_TRUNC(CURRENT_DATE(), MONTH)
-GROUP BY 1
-ORDER BY banking_hit_ratio DESC
-LIMIT 20
-```
-
----
-
-## 7. Output Format
-
-Generate **ONLY** the SQL query wrapped in ```sql ``` tags. No conversational text, no explanations.
-
-**Example**:
-Question: "What is the approval rate for last 3 months?"
-Response:
-```sql
-SELECT 
-  COUNT(*) as total_applications,
-  COUNT(CASE WHEN BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction') THEN 1 END) as approved_count,
-  ROUND(SAFE_DIVIDE(
-    COUNT(CASE WHEN BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction') THEN 1 END),
-    COUNT(*)
-  ) * 100, 2) as approval_rate_pct
-FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.sourcing_table}`
-WHERE DATE(LastModifiedDate) >= DATE_SUB(DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH), INTERVAL 3 MONTH)
-  AND DATE(LastModifiedDate) <= LAST_DAY(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH))
-```
+            **User**: "What is the banking hit ratio by dealer category?"
+            **Assistant**:
+            {{
+            "thought_process": "Metric: Banking Hit Ratio (BKH+BKR)/Total. Dimension: Dealer Category. Scenario A.",
+            "column_mapping": {{
+                "Banking Hit": "LIKE '%_BKH%' OR LIKE '%_BKR%'",
+                "Dealer Category": "Supplier_Categorization__Credit_Team"
+            }},
+            "sql": "SELECT Supplier_Categorization__Credit_Team as dealer_category, COUNT(*) as total_apps, COUNT(CASE WHEN FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%' OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%' THEN 1 END) as banking_hits, ROUND(SAFE_DIVIDE(COUNT(CASE WHEN FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%' OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%' THEN 1 END), COUNT(*)), 4) as banking_hit_ratio FROM `{settings.gcp_project_id}.{settings.bigquery_dataset}.{settings.sourcing_table}` WHERE DATE(LastModifiedDate) >= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH) GROUP BY 1 ORDER BY banking_hit_ratio DESC"
+            }}
 """
     
     def __init__(self):
@@ -275,7 +198,11 @@ WHERE DATE(LastModifiedDate) >= DATE_SUB(DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INT
             model=model_name,
             instruction=self.INSTRUCTION_TEMPLATE,
             output_key="generated_sql",
-            generate_content_config=types.GenerateContentConfig(temperature=0.0)
+            generate_content_config=types.GenerateContentConfig(
+                temperature=0.0,
+                # CRITICAL UPDATE: Enforce JSON output mode
+                response_mime_type="application/json"
+            )
         )
 
         super().__init__(
@@ -345,24 +272,17 @@ WHERE DATE(LastModifiedDate) >= DATE_SUB(DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INT
         
         # 2. Inject schema into LLM agent's instruction (update the sub-agent)
         original_instruction = self.sql_generator.instruction
-        # First, if we have an InvocationContext with a session, populate the
-        # session state so ADK's instructions preprocessor can inject the
-        # `SCHEMA_PLACEHOLDER` safely without raising KeyError.
+        
         if context is not None and hasattr(context, 'session') and hasattr(context.session, 'state'):
             try:
                 context.session.state['SCHEMA_PLACEHOLDER'] = schema_info
             except Exception:
-                # Non-fatal: fall back to direct string replacement below
                 logger.debug("Failed to set session state SCHEMA_PLACEHOLDER; will use fallback replacement")
 
-        # Fallback: replace both double-brace and single-brace placeholders
-        # directly in the instruction. Handle cases where the agent's
-        # `instruction` may be a callable/provider rather than a plain string.
         try:
             if isinstance(original_instruction, str):
                 instr_text = original_instruction
             else:
-                # Avoid invoking callables that may require arguments.
                 instr_text = str(original_instruction)
         except Exception:
             instr_text = str(original_instruction)
@@ -372,7 +292,7 @@ WHERE DATE(LastModifiedDate) >= DATE_SUB(DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INT
         if "{SCHEMA_PLACEHOLDER}" in instr_text:
             instr_text = instr_text.replace("{SCHEMA_PLACEHOLDER}", schema_info)
 
-        # Add explicit user question and a brief last Q/A snippet (if available)
+        # Add explicit user question and a brief last Q/A snippet
         user_q = request.user_question if hasattr(request, 'user_question') else ''
         last_qa = ''
         try:
@@ -385,83 +305,57 @@ WHERE DATE(LastModifiedDate) >= DATE_SUB(DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INT
 
         enhanced_instruction = instr_text + "\n\n" + f"USER_QUESTION: {user_q}\nLAST_QA_SNIPPET: {last_qa}\n"
         self.sql_generator.instruction = enhanced_instruction
-        # Debug: persist the exact instruction sent (truncated in logs)
+        
+        # Debug logs for instruction
         try:
             instr_snippet = (enhanced_instruction[:2000] + '...') if len(enhanced_instruction) > 2000 else enhanced_instruction
             logger.debug(f"Instruction sent to LLM (first 2000 chars): {instr_snippet}")
-            tmp_dir = tempfile.gettempdir()
-            instr_path = os.path.join(tmp_dir, f"llm_instruction_{uuid.uuid4().hex}.txt")
-            with open(instr_path, 'w', encoding='utf-8') as f:
-                f.write(enhanced_instruction)
-            logger.info(f"Full instruction saved to: {instr_path}")
         except Exception:
-            logger.debug("Failed to save instruction to temp file")
+            pass
         
         # 3. Invoke the Sub-Agent
         accumulated_text = ""
+        total_input_tokens = 0
+        total_output_tokens = 0
+
         try:
             async for event in self.sql_generator.run_async(context):
+                # Capture Token Metadata
+                if hasattr(event, 'usage_metadata') and event.usage_metadata:
+                    total_input_tokens = event.usage_metadata.prompt_token_count or 0
+                    total_output_tokens = event.usage_metadata.candidates_token_count or 0
+
                 if event.content and event.content.parts:
                     for part in event.content.parts:
                         if part.text:
                             accumulated_text += part.text
         except Exception as e:
             logger.error(f"Sub-agent execution failed: {e}")
-            # Save any partial LLM output for debugging
-            try:
-                tmp_dir = tempfile.gettempdir()
-                resp_path = os.path.join(tmp_dir, f"llm_response_partial_{uuid.uuid4().hex}.txt")
-                with open(resp_path, 'w', encoding='utf-8') as f:
-                    f.write(accumulated_text)
-                logger.info(f"Partial LLM response saved to: {resp_path}")
-                try:
-                    logger.debug('PARTIAL LLM RESPONSE START')
-                    logger.debug(accumulated_text)
-                    logger.debug('PARTIAL LLM RESPONSE END')
-                except Exception:
-                    logger.debug('Failed to log partial LLM response')
-            except Exception:
-                logger.debug("Failed to save partial LLM response")
             raise
         finally:
             # Restore original instruction
             self.sql_generator.instruction = original_instruction
-            # Clear injected schema from session state to avoid persistence
+            # Clear injected schema from session state
             try:
                 if context is not None and hasattr(context, 'session') and hasattr(context.session, 'state'):
                     if 'SCHEMA_PLACEHOLDER' in context.session.state:
                         del context.session.state['SCHEMA_PLACEHOLDER']
             except Exception:
-                logger.debug("Failed to clear SCHEMA_PLACEHOLDER from session state")
+                pass
 
         # 4. Parse Result
-        # Debug: save full raw LLM output for inspection before parsing
-        try:
-            tmp_dir = tempfile.gettempdir()
-            resp_path = os.path.join(tmp_dir, f"llm_response_full_{uuid.uuid4().hex}.txt")
-            with open(resp_path, 'w', encoding='utf-8') as f:
-                f.write(accumulated_text)
-            logger.info(f"Full LLM response saved to: {resp_path}")
-            if len(accumulated_text) > 2000:
-                logger.debug(f"Raw LLM response (first 2000 chars): {accumulated_text[:2000]}")
-                try:
-                    logger.debug('RAW LLM RESPONSE START')
-                    logger.debug(accumulated_text)
-                    logger.debug('RAW LLM RESPONSE END')
-                except Exception:
-                    logger.debug('Failed to log full LLM response')
-        except Exception:
-            logger.debug("Failed to save full LLM response to temp file")
-
-        parsed = self._parse_and_validate(accumulated_text, request.user_question)
-        # Post-parse check: ensure SQL starts with SELECT or WITH
+        # Pass captured tokens to parsing function
+        parsed = self._parse_and_validate(
+            accumulated_text, 
+            request.user_question, 
+            input_tokens=total_input_tokens, 
+            output_tokens=total_output_tokens
+        )
+        
+        # Post-parse check
         sql_head = parsed.sql_query.strip()[:10].upper()
         if not (sql_head.startswith('SELECT') or sql_head.startswith('WITH')):
             logger.warning(f"Parsed SQL does not start with SELECT/WITH. Head: {sql_head}")
-            try:
-                logger.warning(f"Inspect LLM response: {resp_path}")
-            except Exception:
-                logger.warning("Please inspect the raw LLM response saved above to see why the model returned non-SQL text.")
 
         return parsed
 
@@ -471,32 +365,61 @@ WHERE DATE(LastModifiedDate) >= DATE_SUB(DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INT
             return " ".join(p.text for p in ctx.new_message.parts if p.text)
         return str(ctx.current_input or "")
 
-    def _parse_and_validate(self, llm_output: str, question: str) -> SQLGenerationResponse:
+    def _parse_and_validate(self, llm_output: str, question: str, input_tokens: int = 0, output_tokens: int = 0) -> SQLGenerationResponse:
         """
-        Parses LLM output and validates using SQLGlot (AST) instead of Regex.
+        Parses LLM output (JSON) and validates the extracted SQL.
         """
-        # 1. Extract SQL block - handle multiple code fence variants (sql, googlesql, bigquery, etc.)
-        sql_match = re.search(r'```(?:sql|googlesql|bigquery)\s+(.*?)\s+```', llm_output, re.DOTALL | re.IGNORECASE)
-        if sql_match:
-            raw_sql = sql_match.group(1).strip()
-        else:
-            # Fallback: try any code fence
-            generic_fence = re.search(r'```[a-z]*\s+(.*?)\s+```', llm_output, re.DOTALL | re.IGNORECASE)
-            if generic_fence:
-                raw_sql = generic_fence.group(1).strip()
-            else:
-                # Last resort: strip all code fences and take content
-                cleaned = re.sub(r'```[a-z]*', '', llm_output, flags=re.IGNORECASE)
-                cleaned = cleaned.replace("```", "").strip()
-                raw_sql = cleaned
-
-        # 2. AST Validation & Formatting (The Fix)
+        raw_sql = ""
+        thought_process = "No thought process returned."
+        flattened_mapping = []
+        
+        # --- NEW JSON PARSING LOGIC START ---
         try:
-            # Transpile ensures valid BigQuery syntax and removes weird artifacts
-            # It handles `AS` keywords correctly, unlike the old regex script.
+            cleaned_text = llm_output.strip()
+            # Handle cases where model wraps JSON in markdown blocks
+            if cleaned_text.startswith("```"):
+                # Remove first line (e.g. ```json) and last line (```)
+                lines = cleaned_text.splitlines()
+                if len(lines) >= 2:
+                    if lines[0].startswith("```"): lines = lines[1:]
+                    if lines[-1].startswith("```"): lines = lines[:-1]
+                    cleaned_text = "\n".join(lines)
+            
+            # Parse JSON
+            response_data = json.loads(cleaned_text)
+            
+            # Extract Fields
+            raw_sql = response_data.get("sql", "").strip()
+            thought_process = response_data.get("thought_process", "")
+            column_mapping = response_data.get("column_mapping", {})
+            
+            # Flatten dict for consistency with expected_columns list format
+            if isinstance(column_mapping, dict):
+                flattened_mapping = [f"{k}: {v}" for k, v in column_mapping.items()]
+            
+            logger.info(f"Model Thought: {thought_process}")
+            logger.info(f"Column Mapping: {column_mapping}")
+
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON Parse Failed: {e}. Output was: {llm_output[:100]}...")
+            # Fallback: Try to find raw SQL if JSON failed (Legacy support)
+            sql_match = re.search(r'SELECT\s+.*', llm_output, re.DOTALL | re.IGNORECASE)
+            if sql_match:
+                raw_sql = sql_match.group(0)
+            else:
+                # Last resort cleanup
+                raw_sql = llm_output.replace("```sql", "").replace("```", "").strip()
+        # --- NEW JSON PARSING LOGIC END ---
+
+        # 4. AST Validation & Formatting (SQLGlot)
+        try:
+            if not raw_sql:
+                raise ValueError("Empty SQL extracted from response")
+
+            # Transpile ensures valid BigQuery syntax
             clean_sql = sqlglot.transpile(
                 raw_sql, 
-                read="bigquery", # Let sqlglot guess input dialect (usually accurate for standard SQL)
+                read="bigquery", 
                 write="bigquery", 
                 pretty=True
             )[0]
@@ -504,7 +427,6 @@ WHERE DATE(LastModifiedDate) >= DATE_SUB(DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INT
         except Exception as e:
             logger.error(f"❌ AST Validation Failed: {e}")
             # Fallback: return raw SQL but log warning. 
-            # Often sqlglot is stricter than BQ, but usually it's right.
             clean_sql = raw_sql
 
         return SQLGenerationResponse(
@@ -513,10 +435,14 @@ WHERE DATE(LastModifiedDate) >= DATE_SUB(DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INT
                 domain="SOURCING",
                 intent=question,
                 generated_at=datetime.now(timezone.utc),
-                filters_applied={}
+                filters_applied={},
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                raw_thought_process=thought_process
             ),
-            explanation="Generated via SourcingAgent",
-            expected_columns=[], 
+            # Use the model's thought process as explanation
+            explanation=thought_process, 
+            expected_columns=flattened_mapping, # REUSE EXISTING FIELD
             formatting_hints={}
         )
     

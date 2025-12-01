@@ -1,0 +1,89 @@
+run_id,batch_number,timestamp,question_id,question,expected_domain,actual_domain,status,reason,latency_seconds,input_tokens,output_tokens,generated_sql,error_message
+bd33a1,5,2025-12-01 08:16:21.573692+00:00,1,What is GNS4 trend for last 4 months?,Collections,COLLECTIONS,SKIP,Ref Broken,0.0,0,0,,No SQL Generated
+bd33a1,5,2025-12-01 08:16:29.744289+00:00,2,Give me top 10 dealer names that have the highest NNS3 percentage and cases are more than 30 per dealer? Show the number of cases.,Collections,COLLECTIONS,SKIP,Ref Broken,0.0,0,0,,No SQL Generated
+bd33a1,5,2025-12-01 08:16:35.106147+00:00,3,Show me the top 10 dealers where banking model has highest no hit percentage? application count should be greater than 30 and what is the approval percentage?,Sourcing,SOURCING,SKIP,Ref Broken,0.02,0,0,"SELECT
+  Dealer_Name_Supplier__c,
+  COUNT(*) AS total_applications,
+  COUNT(
+    CASE
+      WHEN NOT (
+        FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%'
+        OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%'
+      )
+      THEN 1
+    END
+  ) AS banking_no_hits,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(
+        CASE
+          WHEN NOT (
+            FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKH%'
+            OR FINAL_APPLICANT_SCORECARD_MODEL_BRE LIKE '%_BKR%'
+          )
+          THEN 1
+        END
+      ),
+      COUNT(*)
+    ) * 100,
+    2
+  ) AS banking_no_hit_percentage,
+  COUNT(CASE WHEN BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction') THEN 1 END) AS approved_applications,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(CASE WHEN BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction') THEN 1 END),
+      COUNT(*)
+    ) * 100,
+    2
+  ) AS approval_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`
+GROUP BY
+  Dealer_Name_Supplier__c
+HAVING
+  COUNT(*) > 30
+ORDER BY
+  banking_no_hit_percentage DESC
+LIMIT 10","string indices must be integers, not 'str'"
+bd33a1,5,2025-12-01 08:16:43.681529+00:00,4,SHow me the bounce rate on 0 dpd for Assam?,Collections,COLLECTIONS,SKIP,Ref Broken,0.0,0,0,,No SQL Generated
+bd33a1,5,2025-12-01 08:16:49.755449+00:00,5,What is the rejection based on CIBIL score below 650 in the last 3 months? Month on month?,Sourcing,COLLECTIONS,SKIP,Ref Broken,0.0,0,0,,No SQL Generated
+bd33a1,5,2025-12-01 08:17:08.095078+00:00,6,What is the rejection rate for applications where CIBIL score is between 300-650 in October 2025? Also list out the reason of rejections for these cases.,Sourcing,SOURCING,SKIP,Ref Broken,0.02,0,0,"SELECT
+  COUNT(*) AS total_applications_in_segment,
+  COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END) AS total_rejected_applications_in_segment,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END),
+      COUNT(*)
+    ) * 100,
+    2
+  ) AS rejection_rate_pct,
+  (
+    SELECT
+      ARRAY_AGG(
+        STRUCT(
+          COALESCE(t2.SCORECARD_MODEL_DESCRIPTION_BRE__c, 'Unknown Reason') AS rejection_reason_description,
+          COUNT(1) AS count_of_rejections_by_reason
+        ) ORDER BY count_of_rejections_by_reason DESC
+        LIMIT 10
+      )
+    FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25` AS t2
+    WHERE
+      DATE(t2.LastModifiedDate) >= '2025-10-01'
+      AND DATE(t2.LastModifiedDate) < '2025-11-01'
+      AND SAFE_CAST(t2.CIBIL_SCORE AS INT64) BETWEEN 300 AND 650
+      AND t2.BRE_Sanction_Result__c IN ('REJECT', 'Reject')
+    GROUP BY
+      t2.SCORECARD_MODEL_DESCRIPTION_BRE__c
+  ) AS top_rejection_reasons_breakdown
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`
+WHERE
+  DATE(LastModifiedDate) >= '2025-10-01'
+  AND DATE(LastModifiedDate) < '2025-11-01'
+  AND SAFE_CAST(CIBIL_SCORE AS INT64) BETWEEN 300 AND 650","string indices must be integers, not 'str'"
+bd33a1,5,2025-12-01 08:17:16.650803+00:00,7,what is the current 1-30 delinquency percentage of the portfolio in comparison with last year?,Collections,COLLECTIONS,SKIP,Ref Broken,0.0,0,0,,No SQL Generated
+bd33a1,5,2025-12-01 08:17:21.527287+00:00,8,How many cases who were at 0 delinquency last year and now have slipped to 90+ ?,Collections,COLLECTIONS,SKIP,Ref Broken,0.0,0,0,,No SQL Generated
+bd33a1,5,2025-12-01 08:17:29.342588+00:00,9,Which state has the highest normalization rate for the current month in DPD BKT 1?,Collections,COLLECTIONS,SKIP,Ref Broken,0.0,0,0,,No SQL Generated
+bd33a1,5,2025-12-01 08:17:34.271267+00:00,10,Which state has the highest roll forward rate for the current month in DPD BKT 2?,Collections,COLLECTIONS,SKIP,Ref Broken,0.0,0,0,,No SQL Generated
+bd33a1,5,2025-12-01 08:17:40.083133+00:00,11,How is the portfolio performing at MOB 3 for 30+ delinquency?,Collections,COLLECTIONS,SKIP,Ref Broken,0.0,0,0,,No SQL Generated
+bd33a1,5,2025-12-01 08:17:45.885203+00:00,12,"Show me the Vintage Curve for 30+ Delinquency for loans disbursed in Jan 2024, Feb 2024, and Mar 2024? At MOB = 3, 6, 9, 12.",Collections,COLLECTIONS,SKIP,Ref Broken,0.0,0,0,,No SQL Generated
+bd33a1,5,2025-12-01 08:17:50.485379+00:00,13,Identify customers who have 'slipped' significantly: They were 0 DPD exactly one year ago but are 90+ DPD today?,Collections,COLLECTIONS,SKIP,Ref Broken,0.0,0,0,,No SQL Generated
+bd33a1,5,2025-12-01 08:17:55.914349+00:00,14,Analyze the portfolio risk by Ticket Size: Amount Finance and show the 90+ DPD POS % for each? highest first.,Collections,COLLECTIONS,SKIP,Ref Broken,0.0,0,0,,No SQL Generated

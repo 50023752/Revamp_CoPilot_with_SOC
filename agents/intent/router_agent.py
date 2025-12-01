@@ -62,7 +62,7 @@ class IntentRouterAgent(BaseAgent):
                 'funnel', 'bre', 'sanction', 'manufacturer', 'dealer',
                 'branch', 'rejected', 'accepted', 'abnd', 'asset cost',
                 'login', 'logins', 'lead', 'leads', 'onboarding', 'CIBIL',
-                'scorecard', 'cyclops', 'banking'
+                'scorecard', 'cyclops', 'banking', "CRIF Index", "crif index", "CRIF index"
             ],
             'patterns': [
                 r'\bapproval\s+rate\b',

@@ -201,7 +201,7 @@ class BigQueryExecutor:
             if 'timestamp' in df.columns:
                 df['timestamp'] = pd.to_datetime(df['timestamp'])
             
-            for col in ['question', 'expected_domain', 'actual_domain', 'status', 'reason', 'generated_sql', 'error_message']:
+            for col in ['question', 'expected_domain', 'actual_domain', 'status', 'reason', 'generated_sql', 'error_message', 'thought_process', 'column_selected']:
                 if col in df.columns:
                     df[col] = df[col].astype(str)
 
@@ -251,11 +251,13 @@ async def get_agent_response(user_question: str) -> Dict[str, Any]:
             # 1. Run Agent (We ignore the return value as it has no metadata)
             async for _ in root_agent.run_async(ctx): pass
 
-            # 2. Extract Data from SESSION STATE (This is where you saved the tokens)
+            # 2. Extract Data from SESSION STATE
             sql = ""
             domain = "Unknown"
             input_tokens = 0
             output_tokens = 0
+            thought_process = ""
+            column_selected = "[]"
             
             # A. Extract SQL & Token Metadata
             if 'sql_generation_response' in ctx.session.state:
@@ -264,24 +266,41 @@ async def get_agent_response(user_question: str) -> Dict[str, Any]:
                 # Handle if data is a Pydantic model (Object) or Dict
                 if isinstance(data, dict):
                     sql = data.get('sql_query') or data.get('generated_sql') or ""
+                    
+                    # Capture Thought Process
+                    thought_process = data.get('explanation') or data.get('metadata', {}).get('raw_thought_process') or ""
+                    
+                    # Capture Column Mapping / Expected Columns
+                    # We accept either direct mapping or expected columns list
+                    cols = data.get('expected_columns') or data.get('column_mapping') or []
+                    column_selected = str(cols)
+
                     meta = data.get('metadata', {})
-                    # LOOK HERE: This matches your new QueryMetadata fields
                     input_tokens = int(meta.get('input_tokens', 0))
                     output_tokens = int(meta.get('output_tokens', 0))
                 else:
                     # Pydantic Object Access
                     sql = getattr(data, 'sql_query', "")
+                    thought_process = getattr(data, 'explanation', "")
+                    
+                    # Capture Column Mapping
+                    cols = getattr(data, 'expected_columns', [])
+                    if not cols and hasattr(data, 'column_mapping'):
+                         cols = getattr(data, 'column_mapping')
+                    column_selected = str(cols)
+
                     meta = getattr(data, 'metadata', None)
                     if meta:
                         input_tokens = int(getattr(meta, 'input_tokens', 0))
                         output_tokens = int(getattr(meta, 'output_tokens', 0))
+                        if not thought_process:
+                             thought_process = getattr(meta, 'raw_thought_process', "")
 
             # B. Extract Domain
             if 'routing_response' in ctx.session.state:
                 data = ctx.session.state['routing_response']
                 if isinstance(data, dict):
                     domain_raw = data.get('selected_domain', 'Unknown')
-                    # Clean up enum string if needed (e.g. "DomainType.COLLECTIONS")
                     domain = str(domain_raw).split('.')[-1]
                 else:
                     domain_raw = getattr(data, 'selected_domain', 'Unknown')
@@ -292,6 +311,8 @@ async def get_agent_response(user_question: str) -> Dict[str, Any]:
                 "domain": str(domain),
                 "input_tokens": input_tokens,
                 "output_tokens": output_tokens,
+                "thought_process": str(thought_process),
+                "column_selected": column_selected,
                 "error": None
             }
 
@@ -299,9 +320,9 @@ async def get_agent_response(user_question: str) -> Dict[str, Any]:
             if attempt < max_retries - 1:
                 await asyncio.sleep(base_delay * (2 ** attempt))
             else:
-                return {"sql": "", "domain": "Unknown", "input_tokens": 0, "output_tokens": 0, "error": f"Max Retries: {e}"}
+                return {"sql": "", "domain": "Unknown", "input_tokens": 0, "output_tokens": 0, "thought_process": "", "column_selected": "[]", "error": f"Max Retries: {e}"}
         except Exception as e:
-            return {"sql": "", "domain": "Unknown", "input_tokens": 0, "output_tokens": 0, "error": f"Crash: {e}"}
+            return {"sql": "", "domain": "Unknown", "input_tokens": 0, "output_tokens": 0, "thought_process": "", "column_selected": "[]", "error": f"Crash: {e}"}
 
 # ==========================================
 # MAIN LOOP (BATCH MODE: Q1..Q14 -> Save -> Repeat)
@@ -387,6 +408,8 @@ async def run_stress_test(total_batches: int = 3):
                     "input_tokens": int(agent_res['input_tokens']),
                     "output_tokens": int(agent_res['output_tokens']),
                     "generated_sql": str(agent_res['sql']),
+                    "thought_process": str(agent_res.get('thought_process', '')),
+                    "column_selected": str(agent_res.get('column_selected', '')),
                     "error_message": str(bot_err) if bot_err else None
                 }
                 current_batch_results.append(row_data)

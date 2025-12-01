@@ -27,6 +27,9 @@ class QueryMetadata(BaseModel):
     filters_applied: Dict[str, Any] = Field(default_factory=dict, description="Filters extracted from user query")
     aggregation_level: Optional[str] = Field(None, description="Monthly/Daily/Yearly aggregation")
     time_range: Optional[Dict[str, str]] = Field(None, description="Start and end dates for the query")
+    raw_thought_process: Optional[str] = Field(None, description="The Chain-of-Thought reasoning from the LLM")
+    input_tokens: int = Field(0, description="Prompt tokens used")
+    output_tokens: int = Field(0, description="Response tokens generated")
 
 class SQLGenerationRequest(BaseModel):
     """Request contract for Domain Agents to generate SQL"""
@@ -37,6 +40,9 @@ class SQLGenerationRequest(BaseModel):
         description="Previous conversation history for follow-up questions"
     )
     session_id: str = Field(..., description="Session identifier for tracking")
+    explanation: Optional[str] = None 
+    expected_columns: List[str] = []
+    formatting_hints: Dict[str, Any] = {}
     
     class Config:
         json_schema_extra = {

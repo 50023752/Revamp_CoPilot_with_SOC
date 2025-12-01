@@ -1,15 +1,15 @@
-SNo,Questions,Domain,,reference_sql
-1,What is GNS4 trend for last 4 months?,Collections,,"SELECT
+SNo,Questions,Domain,reference_sql
+1,What is GNS4 trend for last 4 months?,Collections,"SELECT
   DATE_TRUNC(BUSINESS_DATE, MONTH) AS month,
   ROUND(SAFE_DIVIDE(
       COUNT(DISTINCT CASE WHEN MOB_ON_INSTL_START_DATE = 4 AND Bounce_Flag = 'Y' THEN AGREEMENTNO END),
       COUNT(DISTINCT CASE WHEN MOB_ON_INSTL_START_DATE = 4 THEN AGREEMENTNO END)
   ) * 100, 2) AS gns4_percentage
 FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
-WHERE BUSINESS_DATE >= DATE_SUB((SELECT MAX(BUSINESS_DATE) FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`), INTERVAL 4 MONTH)
+WHERE BUSINESS_DATE >= DATE_SUB((SELECT MAX(BUSINESS_DATE) FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`), INTERVAL 4 MONTH) and SOM_NPASTAGEID = 'REGULAR' and SOM_POS > 0
 GROUP BY 1
 ORDER BY 1 ASC"
-2,Give me top 10 dealer names that have the highest NNS3 percentage and cases are more than 30 per dealer? Show the number of cases.,Collections,,"SELECT
+2,Give me top 10 dealer names that have the highest NNS3 percentage and cases are more than 30 per dealer? Show the number of cases.,Collections,"SELECT
   t2.SUPPLIERNAME AS dealer_name,
   COUNT(DISTINCT t2.AGREEMENTNO) AS total_cases,
   ROUND(SAFE_DIVIDE(
@@ -18,14 +18,14 @@ ORDER BY 1 ASC"
   ) * 100, 2) AS nns3_percentage
 FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2` AS t2
 WHERE t2.BUSINESS_DATE = (SELECT MAX(BUSINESS_DATE) FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`)
-  AND t2.SOM_NPASTAGEID = 'REGULAR'
+  AND t2.SOM_NPASTAGEID = 'REGULAR' and t2.SOM_POS > 0
   AND t2.MOB_ON_INSTL_START_DATE = 3
 GROUP BY 1
 HAVING total_cases > 30
 ORDER BY nns3_percentage DESC
 LIMIT 10"
-3,Show me the top 10 dealers where banking model has highest no hit percentage? application count should be greater than 30 and what is the approval percentage?,Sourcing,,"SELECT
-  Dealer_Name_Supplier__c,
+3,Show me the top 10 dealers where banking model has highest no hit percentage? application count should be greater than 30 and what is the approval percentage?,Sourcing,"SELECT
+  Dealer_Name_Supplier__c AS dealer_name,
   COUNT(*) AS total_applications,
   COUNT(
     CASE
@@ -35,7 +35,7 @@ LIMIT 10"
       )
       THEN 1
     END
-  ) AS no_banking_hit_applications,
+  ) AS no_banking_hit_count,
   ROUND(
     SAFE_DIVIDE(
       COUNT(
@@ -51,6 +51,7 @@ LIMIT 10"
     ) * 100,
     2
   ) AS no_banking_hit_percentage,
+  COUNT(CASE WHEN BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction') THEN 1 END) AS approved_count,
   ROUND(
     SAFE_DIVIDE(
       COUNT(CASE WHEN BRE_Sanction_Result__c IN ('ACCEPT', 'Sanction') THEN 1 END),
@@ -59,14 +60,16 @@ LIMIT 10"
     2
   ) AS approval_percentage
 FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`
+WHERE
+  DATE(LastModifiedDate) >= DATE_SUB(CURRENT_DATE, INTERVAL '3' MONTH)
 GROUP BY
-  1
+  dealer_name
 HAVING
-  COUNT(*) > 30
+  total_applications > 30
 ORDER BY
   no_banking_hit_percentage DESC
 LIMIT 10"
-4,SHow me the bounce rate on 0 dpd for Assam?,Collections,,"WITH MaxDate AS (
+4,SHow me the bounce rate on 0 dpd for Assam?,Collections,"WITH MaxDate AS (
   SELECT MAX(BUSINESS_DATE) AS dt
   FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
 )
@@ -88,7 +91,7 @@ WHERE
   AND t.SOM_POS > 0
 GROUP BY 1
 ORDER BY 1"
-5,What is the rejection based on CIBIL score below 650 in the last 3 months? Month on month?,Sourcing,,"SELECT
+5,What is the rejection based on CIBIL score below 650 in the last 3 months? Month on month?,Sourcing,"SELECT
   FORMAT_DATE('%Y-%m', DATE_TRUNC(DATE(LastModifiedDate), MONTH)) AS month,
   COUNT(*) AS total_applications_below_650_cibil,
   COUNT(CASE WHEN BRE_Sanction_Result__c IN ('REJECT', 'Reject') THEN 1 END) AS rejected_applications_below_650_cibil,
@@ -108,7 +111,7 @@ GROUP BY
   1
 ORDER BY
   1 DESC"
-6,What is the rejection rate for applications where CIBIL score is between 300-650 in October 2025? Also list out the reason of rejections for these cases.,Sourcing,,"WITH FilteredApplications AS (
+6,What is the rejection rate for applications where CIBIL score is between 300-650 in October 2025? Also list out the reason of rejections for these cases.,Sourcing,"WITH FilteredApplications AS (
   SELECT
     BRE_Sanction_Result__c,
     SCORECARD_MODEL_DESCRIPTION_BRE__c
@@ -156,7 +159,7 @@ GROUP BY
 ORDER BY
   sort_order ASC,
   reason_count DESC"
-7,what is the current 1-30 delinquency percentage of the portfolio in comparison with last year?,Collections,,"WITH DateAnchors AS (
+7,what is the current 1-30 delinquency percentage of the portfolio in comparison with last year?,Collections,"WITH DateAnchors AS (
   SELECT
     MAX(BUSINESS_DATE) AS current_max_date,
     DATE_SUB(MAX(BUSINESS_DATE), INTERVAL 1 YEAR) AS last_year_max_date
@@ -185,7 +188,7 @@ SELECT
   ROUND(SAFE_DIVIDE(lyp.dpd_1_30_accounts, lyp.total_active_accounts) * 100, 2) AS last_year_1_30_delinquency_percentage
 FROM CurrentPortfolio cp
 CROSS JOIN LastYearPortfolio lyp"
-8,How many cases who were at 0 delinquency last year and now have slipped to 90+ ?,Collections,,"SELECT
+8,How many cases who were at 0 delinquency last year and now have slipped to 90+ ?,Collections,"SELECT
   COUNT(DISTINCT AGREEMENTNO) AS cases_slipped_0LY_to_90PLUSCurrent
 FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
 WHERE
@@ -194,39 +197,75 @@ WHERE
       MAX(BUSINESS_DATE)
     FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
   )
-  AND SOM_POS > 0
+  AND POS > 0
   AND Delinquency_0LY_90PLUSCurrent_SLIPPAGE_Flag = 1"
-9,Which state has the highest normalization rate for the current month in DPD BKT 1?,Collections,,"SELECT
+9,Which state has the highest normalization rate for the current month in DPD BKT 1?,Collections,"WITH MaxBusinessDate AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_date
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
   STATE,
-  COUNT(DISTINCT CASE WHEN (DPD_BUCKET = 0) THEN AGREEMENTNO END) as normalization_count,
-  COUNT(DISTINCT AGREEMENTNO) as total_bucket_1_count,
-  ROUND(SAFE_DIVIDE(
-    COUNT(DISTINCT CASE WHEN (DPD_BUCKET = 0) THEN AGREEMENTNO END),
-    COUNT(DISTINCT AGREEMENTNO)
-  ) * 100, 2) as normalization_rate
+  COUNT(DISTINCT CASE WHEN DPD_BUCKET = 0 THEN AGREEMENTNO END) AS normalized_accounts_count,
+  COUNT(DISTINCT AGREEMENTNO) AS total_dpd_bkt_1_accounts,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN DPD_BUCKET = 0 THEN AGREEMENTNO END),
+      COUNT(DISTINCT AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS normalization_rate_percentage
 FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
-WHERE BUSINESS_DATE = (SELECT MAX(BUSINESS_DATE) FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`)
+WHERE
+  BUSINESS_DATE = (
+    SELECT
+      max_date
+    FROM MaxBusinessDate
+  )
   AND SOM_DPD_BUCKET = 1
-  AND SOM_NPASTAGEID = 'REGULAR'
-GROUP BY STATE
-ORDER BY normalization_rate DESC
-LIMIT 5"
-10,Which state has the highest roll forward rate for the current month in DPD BKT 2?,Collections,,"SELECT
+  AND POS > 0
+  AND NPASTAGEID = 'REGULAR'
+GROUP BY
+  STATE
+ORDER BY
+  normalization_rate_percentage DESC
+LIMIT 10"
+10,Which state has the highest roll forward rate for the current month in DPD BKT 2?,Collections,"WITH MaxBusinessDate AS (
+  SELECT
+    MAX(BUSINESS_DATE) AS max_date
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+)
+SELECT
   STATE,
-  COUNT(DISTINCT CASE WHEN (DPD_BUCKET - SOM_DPD_BUCKET) > 0 THEN AGREEMENTNO END) as roll_forward_count,
-  COUNT(DISTINCT AGREEMENTNO) as total_bucket_1_count,
-  ROUND(SAFE_DIVIDE(
-    COUNT(DISTINCT CASE WHEN (DPD_BUCKET - SOM_DPD_BUCKET) > 0 THEN AGREEMENTNO END),
-    COUNT(DISTINCT AGREEMENTNO)
-  ) * 100, 2) as roll_forward_rate
+  COUNT(DISTINCT CASE WHEN (
+    DPD_BUCKET - SOM_DPD_BUCKET
+  ) > 0 THEN AGREEMENTNO END) AS roll_forward_count,
+  COUNT(DISTINCT AGREEMENTNO) AS total_bucket_2_accounts,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN (
+        DPD_BUCKET - SOM_DPD_BUCKET
+      ) > 0 THEN AGREEMENTNO END),
+      COUNT(DISTINCT AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS roll_forward_rate
 FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
-WHERE BUSINESS_DATE = (SELECT MAX(BUSINESS_DATE) FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`)
+WHERE
+  BUSINESS_DATE = (
+    SELECT
+      max_date
+    FROM MaxBusinessDate
+  )
   AND SOM_DPD_BUCKET = 2
-  AND SOM_NPASTAGEID = 'REGULAR' and SOM_POS > 0
-GROUP BY STATE
-ORDER BY roll_forward_rate DESC
-LIMIT 5"
-11,How is the portfolio performing at MOB 3 for 30+ delinquency?,Collections,,"SELECT
+  AND NPASTAGEID = 'REGULAR'
+  AND POS > 0
+GROUP BY
+  STATE
+ORDER BY
+  roll_forward_rate DESC
+LIMIT 1"
+11,How is the portfolio performing at MOB 3 for 30+ delinquency?,Collections,"SELECT
   DATE_TRUNC(BUSINESS_DATE, MONTH) as disbursal_month,
   -- Direct calculation using pre-defined mart columns
   ROUND(SAFE_DIVIDE(
@@ -237,7 +276,7 @@ FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
 WHERE BUSINESS_DATE = (SELECT MAX(BUSINESS_DATE) FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`)
 GROUP BY 1
 ORDER BY 1"
-12,"Show me the Vintage Curve for 30+ Delinquency for loans disbursed in Jan 2024, Feb 2024, and Mar 2024? At MOB = 3, 6, 9, 12.",Collections,,"SELECT
+12,"Show me the Vintage Curve for 30+ Delinquency for loans disbursed in Jan 2024, Feb 2024, and Mar 2024? At MOB = 3, 6, 9, 12.",Collections,"SELECT
   DATE_TRUNC(DISBURSALDATE, MONTH) as disbursal_month,
   -- MOB 3 Rate
   ROUND(SAFE_DIVIDE(SUM(NR_30_PLUS_3MOB), SUM(DR_30_PLUS_3MOB)) * 100, 2) as mob_3_rate,
@@ -251,7 +290,7 @@ FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
 WHERE DISBURSALDATE BETWEEN '2024-01-01' AND '2024-03-31'
 GROUP BY 1
 ORDER BY 1;"
-13,Identify customers who have 'slipped' significantly: They were 0 DPD exactly one year ago but are 90+ DPD today?,Collections,,"WITH MaxBusinessDate AS (
+13,Identify customers who have 'slipped' significantly: They were 0 DPD exactly one year ago but are 90+ DPD today?,Collections,"WITH MaxBusinessDate AS (
   SELECT
     MAX(BUSINESS_DATE) AS max_dt
   FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
@@ -264,7 +303,7 @@ JOIN MaxBusinessDate AS m
 WHERE
   t.Delinquency_0LY_90PLUSCurrent_SLIPPAGE_Flag = 1
 LIMIT 10"
-14,Analyze the portfolio risk by Ticket Size: Amount Finance and show the 90+ DPD POS % for each? highest first.,Collections,,"SELECT
+14,Analyze the portfolio risk by Ticket Size: Amount Finance and show the 90+ DPD POS % for each? highest first.,Collections,"SELECT
   AMTFIN_BAND,
   COUNT(DISTINCT AGREEMENTNO) as account_count,
   SUM(POS) as total_pos,
@@ -275,6 +314,70 @@ LIMIT 10"
   ) * 100, 2) as dpd_90_plus_percentage
 FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
 WHERE BUSINESS_DATE = (SELECT MAX(BUSINESS_DATE) FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`)
-  AND SOM_POS > 0
+  AND POS > 0
 GROUP BY 1
 ORDER BY 5 DESC"
+15,what is the current 0+ performance for dealer categories?,Collections,"SELECT
+  Supplier_Categorization__Credit_Team,
+  COUNT(DISTINCT AGREEMENTNO) AS total_accounts,
+  COUNT(DISTINCT CASE WHEN DPD > 0 THEN AGREEMENTNO END) AS col_0_plus_dpd_accounts,
+  ROUND(
+    SAFE_DIVIDE(
+      COUNT(DISTINCT CASE WHEN DPD > 0 THEN AGREEMENTNO END),
+      COUNT(DISTINCT AGREEMENTNO)
+    ) * 100,
+    2
+  ) AS col_0_plus_dpd_percentage
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+WHERE
+  BUSINESS_DATE = (
+    SELECT
+      MAX(BUSINESS_DATE)
+    FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.TW_COLL_MART_HIST_v2`
+  )
+  AND POS > 0
+  AND NPASTAGEID = 'REGULAR'
+GROUP BY
+  Supplier_Categorization__Credit_Team
+ORDER BY
+  col_0_plus_dpd_percentage DESC"
+16,what are the last 3 months disbursals where datasutram model score is more than 500?,Sourcing,"SELECT
+  COUNT(*) AS total_disbursals,
+  SUM(DISBURSED_AMOUNT) AS total_disbursed_amount
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`
+WHERE
+  DISBURSALDATE >= DATE_SUB(CURRENT_DATE, INTERVAL '3' MONTH)
+  AND NOT DISBURSALDATE IS NULL
+  AND SAFE_CAST(Datasutram_score__c AS INT64) > 500 -- Fixed line"
+17,what is the percentage of disbursed cases for last 3 months month on month out of total disbursed for final_application_scorecard model category BH_BKNH_PH? ,Sourcing,"WITH MonthlyDisbursals AS (
+  SELECT
+    DATE_TRUNC(DISBURSALDATE, MONTH) AS disbursal_month,
+    COUNT(*) AS monthly_disbursed_count
+  FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`
+  WHERE
+    NOT DISBURSALDATE IS NULL
+    AND DISBURSALDATE >= DATE_SUB(CURRENT_DATE, INTERVAL '3' MONTH)
+    AND FINAL_APPLICANT_SCORECARD_MODEL_BRE = 'BH_BKNH_PH'
+  GROUP BY
+    1
+)
+SELECT
+  disbursal_month,
+  monthly_disbursed_count,
+  SUM(monthly_disbursed_count) OVER () AS total_disbursed_for_category_in_3_months,
+  ROUND(
+    SAFE_DIVIDE(monthly_disbursed_count, SUM(monthly_disbursed_count) OVER ()) * 100,
+    2
+  ) AS percentage_of_total_disbursed
+FROM MonthlyDisbursals
+ORDER BY
+  disbursal_month"
+18,what are the percentage of last 3 months disbursals in S10 category of CRIF Index?,Sourcing,"SELECT
+  ROUND(
+    SAFE_DIVIDE(COUNT(CASE WHEN Crif_Index__c = 'S10' THEN 1 END), COUNT(*)) * 100,
+    2
+  ) AS percentage_disbursals_in_s10
+FROM `analytics-datapipeline-prod.aiml_cj_nostd_mart.Sourcing_Data_11_Nov_25`
+WHERE
+  DISBURSALDATE >= DATE_SUB(CURRENT_DATE, INTERVAL '3' MONTH)
+  AND NOT DISBURSALDATE IS NULL"

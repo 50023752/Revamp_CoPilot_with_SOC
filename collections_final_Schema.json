@@ -1,0 +1,483 @@
+[
+  {
+    "description": "The month on book from the installment start date. For example, a value of 1 indicates the account's first EMI month.",
+    "name": "MOB_ON_INSTL_START_DATE",
+    "type": "INTEGER"
+  },
+  {
+    "description": "The score from the Early Warning System model.",
+    "name": "EWS_Model_Score",
+    "type": "FLOAT"
+  },
+  {
+    "description": "The output band from the Early Warning System model. CRITICAL RULE: For analysis, you MUST use a CASE statement to group the raw values into these exact three bands, ordered from lowest to highest risk: 'Low' (for values R1-R3), 'Medium' (for values R4-R7), and 'High' (for values R8-R10 and above).",
+    "name": "EWS_Model_Output_Band",
+    "type": "STRING"
+  },
+  {
+    "description": "Unique identifier for the loan agreement, typically an alphanumeric code.",
+    "name": "AGREEMENTNO",
+    "type": "STRING"
+  },
+  {
+    "description": "The number of days past due at the start of the month.",
+    "name": "SOM_DPD",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Indicates the DPD (Days Past Due) bucket of the customer as of the start of the current month. CRITICAL RULE: For analysis, you MUST use these exact buckets: 0, 1, 2, 3, 4, 5+.",
+    "name": "SOM_DPD_BUCKET",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The book size at the start of the month.",
+    "name": "SOM_BOOKSIZE",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Start of Month Principal Outstanding - the outstanding loan amount at the start of the month.",
+    "name": "SOM_POS",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The outstanding overdue charges at the start of the month.",
+    "name": "SOM_ODCDEBTORS",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The cheque bounce charges outstanding at the start of the month.",
+    "name": "SOM_CBCDEBTORS",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The other charges outstanding at the start of the month.",
+    "name": "SOM_OTHERDEBTORS",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Excess money or credit balance at the start of the month.",
+    "name": "SOM_EXCESSMONEY",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The total charges due from the customer at the start of the month.",
+    "name": "SOM_TOTAL_CHARGES_DUE",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The total overdue amount at the start of the month.",
+    "name": "SOM_TOTAL_OD_AMT",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Start-of-Month Non-Performing Asset (NPA) stage. Indicates if the loan is regular, deceased, written-off, or sold (WO_SALE).",
+    "name": "SOM_NPASTAGEID",
+    "type": "STRING"
+  },
+  {
+    "description": "Unique identifier for the branch where the loan was originated.",
+    "name": "BRANCHID",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Name of the branch where the loan was originated.",
+    "name": "BRANCHNAME",
+    "type": "STRING"
+  },
+  {
+    "description": "The total amount financed, including principal and possibly other capitalized fees.",
+    "name": "AMOUNTFINANCE",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Geographical region where the branch is located.",
+    "name": "REGION",
+    "type": "STRING"
+  },
+  {
+    "description": "The date when the loan amount was disbursed.",
+    "name": "DISBURSALDATE",
+    "type": "DATE"
+  },
+  {
+    "description": "The scheduled date when the loan will be fully paid off.",
+    "name": "MATURITYDATE",
+    "type": "DATE"
+  },
+  {
+    "description": "Name of the two-wheeler manufacturer.",
+    "name": "MANUFACTURERNAME",
+    "type": "STRING"
+  },
+  {
+    "description": "The current month on book calculated from the disbursal date.",
+    "name": "MOB_ON_DISB_DT",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Loan-to-Value ratio, representing the loan amount as a percentage of the asset's value.",
+    "name": "LTV",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The effective interest rate of the loan.",
+    "name": "EFFRATE",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The state of the customer.",
+    "name": "STATE",
+    "type": "STRING"
+  },
+  {
+    "description": "Name of the dealer or supplier from whom the vehicle was purchased.",
+    "name": "SUPPLIERNAME",
+    "type": "STRING"
+  },
+  {
+    "description": "The duration of the loan in months.",
+    "name": "TENURE",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The total cost of the asset financed.",
+    "name": "ASSETCOST",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Model name of the two-wheeler being financed.",
+    "name": "ASSETNAME",
+    "type": "STRING"
+  },
+  {
+    "description": "The make of the asset financed.",
+    "name": "ASSETMAKE",
+    "type": "STRING"
+  },
+  {
+    "description": "Current Date Non-Performing Asset (NPA) stage. Indicates if the loan is regular, deceased, written-off, or sold (WO_SALE).",
+    "name": "NPASTAGEID",
+    "type": "STRING"
+  },
+  {
+    "description": "Principal Outstanding - the current remaining principal balance on the loan.",
+    "name": "POS",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The total charges due from the customer.",
+    "name": "TOTAL_CHARGES_DUE",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The unique identifier for the supplier.",
+    "name": "SUPPLIERID",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The name of the scheme.",
+    "name": "SCHEMENAME",
+    "type": "STRING"
+  },
+  {
+    "description": "The zipcode of the customer.",
+    "name": "ZIPCODE",
+    "type": "STRING"
+  },
+  {
+    "description": "The number of EMIs paid by the customer.",
+    "name": "NO_OF_EMI_PAID",
+    "type": "INTEGER"
+  },
+  {
+    "description": "The number of EMIs due.",
+    "name": "NO_EMI_DUE",
+    "type": "INTEGER"
+  },
+  {
+    "description": "The total number of EMIs for the loan.",
+    "name": "TOTAL_NO_OF_EMI",
+    "type": "INTEGER"
+  },
+  {
+    "description": "The occupation of the customer.",
+    "name": "OCCUPATION",
+    "type": "STRING"
+  },
+  {
+    "description": "The gender of the customer.",
+    "name": "GENDER",
+    "type": "STRING"
+  },
+  {
+    "description": "The city of the customer.",
+    "name": "CITY",
+    "type": "STRING"
+  },
+  {
+    "description": "Flag indicating if the loan has been foreclosed ('Y'/'N').",
+    "name": "FORECLOSE_FLAG",
+    "type": "STRING"
+  },
+  {
+    "description": "Indicates whether a loan matured without any delinquency ('Y'/'N').",
+    "name": "NON_DELINQUENTMATURED_FLAG",
+    "type": "STRING"
+  },
+  {
+    "description": "The date of the payment.",
+    "name": "PAYMENT_DATE",
+    "type": "DATE"
+  },
+  {
+    "description": "The month-to-date bounce count.",
+    "name": "MTD_BOUNCE_COUNT",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Indicates if a customer bounced on their first EMI ('Y'/'N'). CRITICAL RULE: When a user asks for 'GNS1', you MUST use this column and MUST apply the filter MOB_ON_INSTL_START_DATE = 1",
+    "name": "GNS1",
+    "type": "STRING"
+  },
+  {
+    "description": "NNS for 1st EMI ('Y'/'N'). CRITICAL RULE: This is only valid for accounts in their 1st month. Any calculation MUST be filtered for MOB_ON_INSTL_START_DATE = 1.",
+    "name": "NNS1",
+    "type": "STRING"
+  },
+  {
+    "description": "NNS for 2nd EMI ('Y'/'N'). CRITICAL RULE: This is only valid for accounts in their 2nd month. Any calculation MUST be filtered for MOB_ON_INSTL_START_DATE = 2.",
+    "name": "NNS2",
+    "type": "STRING"
+  },
+  {
+    "description": "NNS for 3rd EMI ('Y'/'N'). CRITICAL RULE: This is only valid for accounts in their 3rd month. Any calculation MUST be filtered for MOB_ON_INSTL_START_DATE = 3.",
+    "name": "NNS3",
+    "type": "STRING"
+  },
+  {
+    "description": "NNS for 4th EMI ('Y'/'N'). CRITICAL RULE: This is only valid for accounts in their 4th month. Any calculation MUST be filtered for MOB_ON_INSTL_START_DATE = 4.",
+    "name": "NNS4",
+    "type": "STRING"
+  },
+  {
+    "description": "NNS for 5th EMI ('Y'/'N'). CRITICAL RULE: This is only valid for accounts in their 5th month. Any calculation MUST be filtered for MOB_ON_INSTL_START_DATE = 5.",
+    "name": "NNS5",
+    "type": "STRING"
+  },
+  {
+    "description": "NNS for 6th EMI ('Y'/'N'). CRITICAL RULE: This is only valid for accounts in their 6th month. Any calculation MUST be filtered for MOB_ON_INSTL_START_DATE = 6.",
+    "name": "NNS6",
+    "type": "STRING"
+  },
+  {
+    "description": "The total charge collection for the current month.",
+    "name": "TOTAL_CHARGE_COLLECTION",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The status of the charge collection.",
+    "name": "CHARGE_COLLECTION_STATUS",
+    "type": "STRING"
+  },
+  {
+    "description": "Indicates if charges are collected ('Y'/'N').",
+    "name": "CHARGE_COLLECTION_FLAG",
+    "type": "STRING"
+  },
+  {
+    "description": "The operational date for which the data is relevant. This is the primary date field for filtering time-series data.",
+    "name": "BUSINESS_DATE",
+    "type": "DATE"
+  },
+  {
+    "description": "Indicator if the borrower is considered a prime customer (better credit quality, 'Y'/'N').",
+    "name": "PrimeFlag",
+    "type": "STRING"
+  },
+  {
+    "description": "Indicates if the payment has bounced for the current month ('Y'/'N').",
+    "name": "Bounce_Flag",
+    "type": "STRING"
+  },
+  {
+    "description": "The final amount collected from the customer.",
+    "name": "Final_COLLECTION_AMOUNT",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Indicates if the customer has slipped from 0 days past due last year to 90+ days past due currently (1 for yes, 0 for no).",
+    "name": "Delinquency_0LY_90PLUSCurrent_SLIPPAGE_Flag",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Indicates if the customer has slipped from 1-30 days past due last year to 90+ days past due currently (1 for yes, 0 for no).",
+    "name": "Delinquency_1_30LY_90PLUSCurrent_SLIPPAGE_Flag",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Indicates if the customer has slipped from 31-60 days past due last year to 90+ days past due currently (1 for yes, 0 for no).",
+    "name": "Delinquency_31_60LY_90PLUSCurrent_SLIPPAGE_Flag",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Indicates if the customer has slipped from 61-90 days past due last year to 90+ days past due currently (1 for yes, 0 for no).",
+    "name": "Delinquency_61_90LY_90PLUSCurrent_SLIPPAGE_Flag",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Categorization of customer's location. CRITICAL RULE: When reporting by TIER, you MUST use these exact group names: 'Tier 1' (for METRO), 'Tier 2' (for URBAN and SEMI_URBAN), and 'Tier 3' (for RURAL).",
+    "name": "TIER",
+    "type": "STRING"
+  },
+  {
+    "description": "The risk bucket from the Early Warning System model.",
+    "name": "EWS_Risk_Bucket",
+    "type": "STRING"
+  },
+  {
+    "description": "Indicates the DPD (Days Past Due) bucket of the customer as of the end of the current month. CRITICAL RULE: For analysis, you MUST use these exact buckets: 0, 1, 2, 3, 4, 5+.",
+    "name": "DPD_BUCKET",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "These are the AMOUNTFINANCE variable as per bands created by different teams. So any ACCOUNTFINANCE related cohorts use this variable directly.",
+    "name": "AMTFIN_BAND",
+    "type": "STRING"
+  },
+  {
+    "description": "These are the EMI variable as per bands created by different teams. So any EMI related cohorts use this variable directly.",
+    "name": "EMI_BAND",
+    "type": "STRING"
+  },
+  {
+    "description": "These are the ASSETCOST variable as per bands created by different teams. So any ASSETCOST related cohorts use this variable directly.",
+    "name": "ASSETCOST_BAND",
+    "type": "STRING"
+  },
+  {
+    "description": "This variable tells the 0+ count for the portfolio at the current business date.",
+    "name": "NR_0_PLUS_cnt",
+    "type": "INTEGER"
+  },
+  {
+    "description": "This variable tells the 30+ count for the portfolio at the current business date.",
+    "name": "NR_30_PLUS_cnt",
+    "type": "INTEGER"
+  },
+  {
+    "description": "This variable tells the 60+ count for the portfolio at the current business date.",
+    "name": "NR_60_PLUS_cnt",
+    "type": "INTEGER"
+  },
+  {
+    "description": "This variable tells the 90+ count for the portfolio at the current business date.",
+    "name": "NR_90_PLUS_cnt",
+    "type": "INTEGER"
+  },
+  {
+    "description": "This variable tells the 0+ DPD POS principal outstanding for the portfolio at the current business date.",
+    "name": "NR_0_PLUS",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "This variable tells the 30+ DPD POS principal outstanding for the portfolio at the current business date.",
+    "name": "NR_30_PLUS",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "This variable tells the 60+ DPD POS principal outstanding for the portfolio at the current business date.",
+    "name": "NR_60_PLUS",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "This variable tells the 90+ DPD POS principal outstanding for the portfolio at the current business date.",
+    "name": "NR_90_PLUS",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Represents the Principal Outstanding (POS) amount at the current business date, filtered for high-risk accounts. Specifically targets loans where: (1) Delinquency is 30 days or more (30+ DPD) AND (2) Vintage is greater than 3 months (MOB > 3)",
+    "name": "NR_30_PLUS_3_LAGGED",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Represents the Principal Outstanding (POS) amount at the current business date, filtered for high-risk accounts. Specifically targets loans where: (1) Delinquency is 90 days or more (90+ DPD) AND (2) Vintage is greater than 3 months (MOB > 3)",
+    "name": "NR_90_PLUS_3_LAGGED",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Seasoned Portfolio Exposure: The total Principal Outstanding (POS) for accounts that have been on the book for more than 3 months (MOB > 3). Used to analyze the risk of the mature portfolio, excluding early vintage accounts.",
+    "name": "DR_PLUS_3_LAGGED",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Calculates the Principal Outstanding (POS) for accounts in the 31-to-180 day delinquency bucket. This includes accounts where Days Past Due (DPD) is strictly greater than 30 and less than or equal to 180.",
+    "name": "NR_31_180_PLUS",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Calculates the Principal Outstanding (POS) for accounts in the 91-to-180 day delinquency bucket (often considered late-stage delinquency). This includes accounts where Days Past Due (DPD) is strictly greater than 90 and less than or equal to 180",
+    "name": "NR_91_180_PLUS",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "30+ DPD POS at MOB 3: The Principal Outstanding (POS) of accounts that are 30+ days past due specifically when they are at Month on Book 3.",
+    "name": "NR_30_PLUS_3MOB",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "30+ DPD POS at MOB 6: The Principal Outstanding (POS) of accounts that are 30+ days past due specifically when they are at Month on Book 6.30+ DPD POS at MOB 6: The Principal Outstanding (POS) of accounts that are 30+ days past due specifically when they are at Month on Book 6.",
+    "name": "NR_30_PLUS_6MOB",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "30+ DPD POS at MOB 6: The Principal Outstanding (POS) of accounts that are 30+ days past due specifically when they are at Month on Book 9.",
+    "name": "NR_30_PLUS_9MOB",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "30+ DPD POS at MOB 6: The Principal Outstanding (POS) of accounts that are 30+ days past due specifically when they are at Month on Book 12.",
+    "name": "NR_30_PLUS_12MOB",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Disbursals Matured to MOB 3: The original Disbursed Amount for all accounts that have reached exactly Month on Book 3. Used as the denominator for MOB 3 vintage analysis.",
+    "name": "DR_30_PLUS_3MOB",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Disbursals Matured to MOB 6: The original Disbursed Amount for all accounts that have reached exactly Month on Book 6. Used as the denominator for MOB 6 vintage analysis.",
+    "name": "DR_30_PLUS_6MOB",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Disbursals Matured to MOB 9: The original Disbursed Amount for all accounts that have reached exactly Month on Book 9. Used as the denominator for MOB 9 vintage analysis.",
+    "name": "DR_30_PLUS_9MOB",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Disbursals Matured to MOB 12: The original Disbursed Amount for all accounts that have reached exactly Month on Book 12. Used as the denominator for MOB 12 vintage analysis.",
+    "name": "DR_30_PLUS_12MOB",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "This if the flag for if the customers RC is pending for submission to the company or not. 1 implies RC is pending for submission and 0 implies RC is not pending for submission.",
+    "name": "RC_PENDING_OVERALL",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The ID of the FLS. Field level sales executive ID who sourced this loan.",
+    "name": "FLSID",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "The name of the FLS. Field level sales executive name who sourced this loan.",
+    "name": "FLSNAME",
+    "type": "STRING"
+  },
+  
+  {
+    "description": "A hierarchical classification assigned by the Credit Team to segment suppliers or dealers based on their risk profile and performance. This is an ordinal variable used for portfolio stratification. Valid values include: 'Bronze', 'Silver', 'Gold', 'Diamond', and 'Platinum' (typically ranked from lowest to highest status",
+    "name": "Supplier_Categorization__Credit_Team",
+    "type": "STRING"
+  }
+]
