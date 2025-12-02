@@ -395,40 +395,75 @@ def run_query_sync_wrapper(user_question: str, session_id: str, history: list):
 # ---------------------- AUTHENTICATION ----------------------
 
 def authenticate():
-    """Handle user authentication"""
-    st.sidebar.title("Login")
+    """
+    Handle user authentication with SHA-256 hashing.
+    
+    Security Features:
+    - Passwords are hashed using SHA-256 before comparison
+    - No plain text passwords stored in code or environment
+    - Credentials loaded from secure environment variables
+    - Constant-time comparison via hash matching
+    
+    Environment Variables:
+    - ADMIN_PASSWORD_HASH: Single user mode (SHA-256 hash)
+    - USER_CREDENTIALS: Multi-user JSON with username/password_hash pairs
+    
+    Returns:
+        bool: True if authenticated, False otherwise
+    """
+    from utils.auth_utils import authenticate_user, load_user_credentials
+    
+    st.sidebar.title("🔐 Login")
 
+    # Check if already authenticated
     if st.session_state.get("authenticated"):
-        st.sidebar.success(f"Welcome, {st.session_state.get('username')}!")
+        username = st.session_state.get('username', 'User')
+        st.sidebar.success(f"✓ Logged in as: **{username}**")
+        
+        # Add logout button
+        if st.sidebar.button("Logout", key="auth_logout"):
+            st.session_state["authenticated"] = False
+            st.session_state["username"] = None
+            st.rerun()
+        
         return True
 
-    creds_str = os.getenv("USER_CREDENTIALS")
-    username = st.sidebar.text_input("Username", key="auth_user")
-    password = st.sidebar.text_input("Password", type="password", key="auth_pw")
-
-    if st.sidebar.button("Login", key="auth_login"):
-        user_credentials = [{"username": "admin", "password": "password"}]
-
-        if creds_str:
-            try:
-                loaded_creds = json.loads(creds_str)
-                if isinstance(loaded_creds, list):
-                    user_credentials = loaded_creds
-            except json.JSONDecodeError:
-                st.sidebar.error("Invalid USER_CREDENTIALS JSON format.")
-                return False
-
-        for cred in user_credentials:
-            if cred.get("username") == username and cred.get("password") == password:
-                st.session_state["authenticated"] = True
-                st.session_state["username"] = username
-                st.sidebar.success(f"Welcome, {username}!")
-                st.rerun()
-                return True
-
-        st.sidebar.error("Invalid username or password.")
+    # Load credentials to check if auth is configured
+    credentials = load_user_credentials()
+    
+    if not credentials:
+        # No credentials configured - show warning and deny access
+        st.sidebar.warning("⚠️ Authentication not configured")
+        st.sidebar.info(
+            "Set `ADMIN_PASSWORD_HASH` environment variable to enable login. "
+            "Use `python utils/auth_utils.py` to generate a hash."
+        )
         return False
 
+    # Show login form
+    username = st.sidebar.text_input("Username", key="auth_user", placeholder="admin")
+    password = st.sidebar.text_input("Password", type="password", key="auth_pw", placeholder="Enter password")
+
+    if st.sidebar.button("Login", key="auth_login", type="primary"):
+        if not username or not password:
+            st.sidebar.error("⚠️ Please enter both username and password")
+            return False
+        
+        # Authenticate using secure hash comparison
+        if authenticate_user(username, password):
+            st.session_state["authenticated"] = True
+            st.session_state["username"] = username
+            logger.info(f"User authenticated: {username}")
+            st.sidebar.success(f"✓ Welcome, {username}!")
+            st.rerun()
+            return True
+        else:
+            logger.warning(f"Failed login attempt for username: {username}")
+            st.sidebar.error("❌ Invalid username or password")
+            return False
+
+    # Show helpful hint
+    st.sidebar.caption("💡 Contact your administrator for credentials")
     return False
 
 

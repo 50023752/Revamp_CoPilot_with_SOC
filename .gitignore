@@ -7,6 +7,7 @@ __pycache__/
 env/
 venv/
 ENV/
+.venv/
 build/
 develop-eggs/
 dist/
@@ -22,10 +23,12 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+MANIFEST
 
-# Environment
+# Environment (CRITICAL - contains secrets)
 .env
 .env.local
+.env.*.local
 
 # IDE
 .vscode/
@@ -38,6 +41,8 @@ wheels/
 .pytest_cache/
 .coverage
 htmlcov/
+.tox/
+.hypothesis/
 *.log
 
 # ADK
@@ -47,3 +52,46 @@ adk_cache/
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
+
+# Reports & Generated Files
+reports/
+logs/
+*.csv
+*.xlsx
+
+# Google Cloud (CRITICAL - credentials)
+.gcloud/
+.config/gcloud/
+credentials.json
+service-account-key.json
+*.key
+*.pem
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Deployment (if containing secrets)
+deployment/.env
+deployment/*.key
+deployment/*.pem
+
+# Data (exclude large files, keep schemas)
+data/*.csv
+data/*.json
+!data/*_Schema.json
+!data/golden_question_bank.csv
+
+# Legacy Files (optional tracking)
+legacy/
+
+# Temporary Files
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+*.ipynb
+

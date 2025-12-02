@@ -1,0 +1,79 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+.github/
+
+# Environment files (will be set in Cloud Run)
+.env
+
+# Documentation
+*.md
+ARCHITECTURE*.md
+DELIVERABLES*.md
+
+# Test files
+tests/
+test_*.py
+*_test.py
+pytest.ini
+
+# Reports and logs
+reports/
+*.log
+stress_test.log
+
+# Misc
+.DS_Store
+*.csv
+golden_question_bank.csv
+
+# Architecture docs
+architecture/
+
+# Trial files
+streamlit_app_trial1.py
+agent.py
+run_evals.py
+upload_to_bq.py
+final_stress_testing.py
+test_token_capture.py
+
+# JSON schemas
+*.json
