@@ -27,14 +27,14 @@ echo ""
 echo "📌 [1/4] Setting GCP project..."
 gcloud config set project ${PROJECT_ID}
 
-# Step 2: Enable required APIs
-echo ""
-echo "🔧 [2/4] Enabling required Google Cloud APIs..."
-gcloud services enable \
-  run.googleapis.com \
-  artifactregistry.googleapis.com \
-  cloudbuild.googleapis.com \
-  bigquery.googleapis.com
+# # Step 2: Enable required APIs
+# echo ""
+# echo "🔧 [2/4] Enabling required Google Cloud APIs..."
+# gcloud services enable \
+#   run.googleapis.com \
+#   artifactregistry.googleapis.com \
+#   cloudbuild.googleapis.com \
+#   bigquery.googleapis.com
 
 # Step 3: Create Artifact Registry repository
 echo ""

@@ -762,7 +762,7 @@ def main():
 
 # Entry point
 if __name__ == "__main__":
-    #main()
+    # main()
     #Uncomment for authentication
     if authenticate():
         main()

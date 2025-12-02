@@ -75,6 +75,7 @@ service-account-key.json
 deployment/.env
 deployment/*.key
 deployment/*.pem
+deployment/deploy.sh
 
 # Data (exclude large files, keep schemas)
 data/*.csv

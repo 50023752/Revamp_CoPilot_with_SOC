@@ -1,180 +1,101 @@
 #!/bin/bash
+set -e
 
 # ============================================
-# Cloud Run Deployment Script - Orion Copilot
-# Enterprise-Grade Security Configuration
+# Configuration
 # ============================================
-# 
-# SECURITY FEATURES:
-# - Artifact Registry (modern, secure container storage)
-# - Dedicated service account (least privilege principle)
-# - SHA-256 password hashing (no plain text secrets)
-# - Environment variable injection (runtime configuration)
-#
-# PREREQUISITES:
-# 1. Create Artifact Registry repository:
-#    gcloud artifacts repositories create orion-copilot-repo \
-#      --repository-format=docker \
-#      --location=asia-south1
-#
-# 2. Create service account:
-#    gcloud iam service-accounts create orion-copilot-sa \
-#      --display-name="Orion Copilot Service Account"
-#
-# 3. Grant required permissions:
-#    gcloud projects add-iam-policy-binding analytics-datapipeline-prod \
-#      --member="serviceAccount:orion-copilot-sa@analytics-datapipeline-prod.iam.gserviceaccount.com" \
-#      --role="roles/bigquery.dataEditor"
-#    gcloud projects add-iam-policy-binding analytics-datapipeline-prod \
-#      --member="serviceAccount:orion-copilot-sa@analytics-datapipeline-prod.iam.gserviceaccount.com" \
-#      --role="roles/bigquery.jobUser"
-#
-# 4. Generate password hash:
-#    python utils/auth_utils.py YourSecurePassword123
-#    Copy the hash for use in ADMIN_PASSWORD_HASH below
-#
-# ============================================
-
-set -e  # Exit immediately if a command exits with a non-zero status
-
-# --- Configuration ---
 PROJECT_ID="analytics-datapipeline-prod"
 REGION="asia-south1"
 SERVICE_NAME="orion-copilot"
-
-# Artifact Registry Configuration (Modern Standard)
+GCS_BUCKET="aiml-cj"
 REPO_NAME="orion-copilot-repo"
-IMAGE_NAME="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${SERVICE_NAME}"
 
-# Service Account Configuration
-# Using default compute service account (linked to your email)
-# No need to create a new service account
-SERVICE_ACCOUNT="" # Empty means use default compute service account
-
-# ============================================
-# SECURITY: Multi-User Authentication
-# ============================================
-# Generate hashes using: python utils/auth_utils.py "YourPassword"
-#
-# TEAM-BASED USER CREDENTIALS (JSON Format)
-# Replace the hashes below with your actual SHA-256 hashes
-#
-# Step 1: Generate hash for each user:
-#   python utils/auth_utils.py "RiskTeamPass123"
-#   python utils/auth_utils.py "CreditTeamPass456"
-#   python utils/auth_utils.py "CollectionTeamPass789"
-#
-# Step 2: Replace the placeholder hashes below
-
-USER_CREDENTIALS='[
-  {"username": "risk_team_user", "password_hash": "REPLACE_WITH_RISK_TEAM_HASH"},
-  {"username": "credit_team_user", "password_hash": "REPLACE_WITH_CREDIT_TEAM_HASH"},
-  {"username": "collection_team_user", "password_hash": "REPLACE_WITH_COLLECTION_TEAM_HASH"}
-]'
-
-# Validate that credentials have been configured
-if echo "$USER_CREDENTIALS" | grep -q "REPLACE_WITH"; then
-    echo "❌ ERROR: User credentials not configured!"
-    echo ""
-    echo "Generate password hashes:"
-    echo "  python utils/auth_utils.py RiskTeamPassword"
-    echo "  python utils/auth_utils.py CreditTeamPassword"
-    echo "  python utils/auth_utils.py CollectionTeamPassword"
-    echo ""
-    echo "Then update this script with the hashes in USER_CREDENTIALS"
-    echo ""
-    exit 1
+# 1. Generate Git Tag
+if git rev-parse --short HEAD > /dev/null 2>&1; then
+  TAG=$(git rev-parse --short HEAD)
+else
+  TAG="manual-$(date +%s)"
 fi
 
-echo "🚀 Deploying Orion Copilot to Cloud Run (Secure Mode)"
-echo "========================================================"
-echo "Project:         ${PROJECT_ID}"
-echo "Region:          ${REGION}"
-echo "Service:         ${SERVICE_NAME}"
-echo "Image:           ${IMAGE_NAME}"
-echo "Service Account: Default Compute (linked to your email)"
-echo "Auth Method:     Multi-User SHA-256 Password Hashing"
-echo "User Teams:      risk_team, credit_team, collection_team"
-echo "========================================================"
-echo ""
+# ============================================
+# SECURITY: User Credentials (JSON)
+# ============================================
+# NOTE: We define this as a standard bash string. 
+# We will pass it to Python later to handle the formatting safely.
+USER_CREDENTIALS='[{"username":"risk_team_user","password_hash":"dc3ebd167176ae342e035e74cc1eaa5f43e0b62159dc3a7af6d2489386613d7f"},{"username":"credit_team_user","password_hash":"49f7fefb5768c0c6dae7f9b64a6f190639948054ebcc21b90737be9e6c6933b7"},{"username":"admin","password_hash":"8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918"}, {"username":"analytics_team_user","password_hash":"a0359600ea16251d7ebe060617c15b459e11c896cabd0d1fa6e50c545c4ae009"}]'
 
-# Step 1: Set the project context
-echo "📌 [1/5] Setting GCP project context..."
+echo "🚀 Deploying Orion Copilot"
+echo "========================================"
+echo "Project: ${PROJECT_ID}"
+echo "Region:  ${REGION}"
+echo "Tag:     ${TAG}"
+echo "========================================"
+
+# 2. Set Project
 gcloud config set project ${PROJECT_ID}
 
-# Step 2: Enable required APIs
-echo ""
-echo "🔧 [2/5] Enabling required APIs..."
-gcloud services enable \
-  run.googleapis.com \
-  artifactregistry.googleapis.com \
-  cloudbuild.googleapis.com \
-  bigquery.googleapis.com
+# 3. Generate Env Vars File (The Python Fix)
+# We use python to dump the YAML. This handles quotes/newlines perfectly.
+echo "📝 Generating environment configuration..."
+python3 -c "
+import yaml
+import os
 
-# Step 3: Build and push container to Artifact Registry
-echo ""
-echo "🏗️  [3/5] Building and pushing container to Artifact Registry..."
-gcloud builds submit --tag ${IMAGE_NAME}:latest
+data = {
+    'GCP_PROJECT_ID': '${PROJECT_ID}',
+    'GCP_REGION': '${REGION}',
+    'BIGQUERY_DATASET': 'aiml_cj_nostd_mart',
+    'BIGQUERY_LOCATION': 'asia-south1',
+    'VERTEX_AI_LOCATION': 'asia-south1',
+    'SOURCING_TABLE': 'Sourcing_Data_11_Nov_25',
+    'COLLECTIONS_TABLE': 'TW_COLL_MART_HIST_v2',
+    'DISBURSAL_TABLE': 'TW_NOSTD_MART_REALTIME_UPDATED',
+    'GEMINI_PRO_MODEL': 'gemini-2.5-pro',
+    'GEMINI_FLASH_MODEL': 'gemini-2.5-flash',
+    'LLM_TEMPERATURE': '0.1',
+    'LLM_MAX_OUTPUT_TOKENS': '8192',
+    'LOGGING_DATASET': 'aiml_cj_nostd_mart',
+    'LOGGING_TABLE': 'adk_copilot_logs',
+    'ADK_SESSION_BACKEND': 'in-memory',
+    'ADK_LOG_LEVEL': 'INFO',
+    'USER_CREDENTIALS': '${USER_CREDENTIALS}',
+    'GOOGLE_API_KEY': 'AIzaSyA7k6a3Kl2zk4GEyZgm1O909tsOViq6620'
+}
 
-# Step 4: Deploy to Cloud Run with security configurations
+with open('env_vars.yaml', 'w') as f:
+    yaml.dump(data, f, default_flow_style=False)
+"
+
+# 4. Build & Push
 echo ""
-echo "🚀 [4/5] Deploying to Cloud Run..."
+echo "🏗️  Building image..."
+cd .. 
+gcloud builds submit \
+  --config=deployment/cloudbuild.yaml \
+  --gcs-log-dir=gs://${GCS_BUCKET}/orion-copilot/logs \
+  --gcs-source-staging-dir=gs://${GCS_BUCKET}/orion-copilot/source \
+  --substitutions=_REPO_NAME=${REPO_NAME},_SERVICE_NAME=${SERVICE_NAME},_REGION=${REGION},_TAG=${TAG} \
+  .
+cd deployment
+
+# 5. Deploy to Cloud Run using the Env File
+echo ""
+echo "🚀 Deploying service..."
 gcloud run deploy ${SERVICE_NAME} \
-  --image ${IMAGE_NAME}:latest \
+  --image ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${SERVICE_NAME}:${TAG} \
   --platform managed \
   --region ${REGION} \
   --allow-unauthenticated \
   --memory 2Gi \
   --cpu 2 \
   --timeout 300s \
-  --max-instances 10 \
-  --min-instances 0 \
   --port 8080 \
-  --set-env-vars "GCP_PROJECT_ID=${PROJECT_ID}" \
-  --set-env-vars "GCP_REGION=${REGION}" \
-  --set-env-vars "BIGQUERY_DATASET=aiml_cj_nostd_mart" \
-  --set-env-vars "BIGQUERY_LOCATION=asia-south1" \
-  --set-env-vars "VERTEX_AI_LOCATION=asia-south1" \
-  --set-env-vars "GEMINI_PRO_MODEL=gemini-2.5-pro" \
-  --set-env-vars "GEMINI_FLASH_MODEL=gemini-2.5-flash" \
-  --set-env-vars "LLM_TEMPERATURE=0.1" \
-  --set-env-vars "LLM_MAX_OUTPUT_TOKENS=8192" \
-  --set-env-vars "LOGGING_DATASET=aiml_cj_nostd_mart" \
-  --set-env-vars "LOGGING_TABLE=adk_copilot_logs" \
-  --set-env-vars "USER_CREDENTIALS=${USER_CREDENTIALS}"
+  --env-vars-file env_vars.yaml
 
-# Step 5: Get the service URL and display success message
+# Cleanup sensitive file
+rm env_vars.yaml
+
 echo ""
-echo "✅ [5/5] Deployment complete!"
-echo ""
+echo "✅ Deployment Complete!"
 SERVICE_URL=$(gcloud run services describe ${SERVICE_NAME} --region=${REGION} --format='value(status.url)')
-echo "========================================================"
-echo "🌐 Service URL: ${SERVICE_URL}"
-echo "========================================================"
-echo ""
-echo "📋 DEPLOYMENT SUMMARY:"
-echo "  ✓ Container: Artifact Registry (${REPO_NAME})"
-echo "  ✓ Runtime: Non-root user (appuser)"
-echo "  ✓ Auth: SHA-256 hashed passwords"
-echo "  ✓ Service Account: ${SERVICE_ACCOUNT}"
-echo "  ✓ Memory: 2GB | CPU: 2 cores | Timeout: 5min"
-echo ""
-echo "📝 NEXT STEPS:"
-echo "  1. Visit ${SERVICE_URL} and log in"
-echo "  2. Available usernames:"
-echo "     - risk_team_user"
-echo "     - credit_team_user"
-echo "     - collection_team_user"
-echo "  3. Passwords: (the passwords you hashed for each team)"
-echo ""
-echo "🔒 SECURITY NOTES:"
-echo "  - Password hashes stored as env var (not in code)"
-echo "  - App runs as non-root user in container"
-echo "  - Using default compute service account (linked to your email)"
-echo "  - Multi-user authentication with team-based access"
-echo "  - No plain text secrets in repository"
-echo ""
-echo "📊 MONITORING:"
-echo "  View logs: gcloud run services logs read ${SERVICE_NAME} --region=${REGION} --follow"
-echo "  View metrics: https://console.cloud.google.com/run/detail/${REGION}/${SERVICE_NAME}/metrics"
-echo ""
+echo "🌐 URL: ${SERVICE_URL}"

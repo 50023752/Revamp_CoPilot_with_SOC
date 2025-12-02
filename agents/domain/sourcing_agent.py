@@ -365,56 +365,86 @@ class SourcingAgent(BaseAgent):
             return " ".join(p.text for p in ctx.new_message.parts if p.text)
         return str(ctx.current_input or "")
 
+    def _extract_json_substring(self, text: str) -> str:
+        """
+        Finds the first valid JSON object in a string by locating the outer {}.
+        """
+        text = text.strip()
+        
+        # 1. Fast path: It's already pure JSON
+        if text.startswith("{") and text.endswith("}"):
+            return text
+
+        # 2. Markdown Cleanup: Remove ```json ... ```
+        if "```" in text:
+            # Remove line starting with ```json
+            text = re.sub(r'^```[a-zA-Z]*\s*', '', text, flags=re.MULTILINE)
+            # Remove ending ```
+            text = re.sub(r'```\s*$', '', text, flags=re.MULTILINE)
+            text = text.strip()
+
+        # 3. Brute Force: Find the first '{' and the last '}'
+        start_idx = text.find("{")
+        end_idx = text.rfind("}")
+
+        if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+            return text[start_idx : end_idx + 1]
+        
+        return text # Return original if no brackets found (let JSONDecodeError catch it)
+
     def _parse_and_validate(self, llm_output: str, question: str, input_tokens: int = 0, output_tokens: int = 0) -> SQLGenerationResponse:
         """
         Parses LLM output (JSON) and validates the extracted SQL.
         """
         raw_sql = ""
         thought_process = "No thought process returned."
-        flattened_mapping = []
+        flattened_mapping = [] # Safe initialization
         
         # --- NEW JSON PARSING LOGIC START ---
         try:
-            cleaned_text = llm_output.strip()
-            # Handle cases where model wraps JSON in markdown blocks
-            if cleaned_text.startswith("```"):
-                # Remove first line (e.g. ```json) and last line (```)
-                lines = cleaned_text.splitlines()
-                if len(lines) >= 2:
-                    if lines[0].startswith("```"): lines = lines[1:]
-                    if lines[-1].startswith("```"): lines = lines[:-1]
-                    cleaned_text = "\n".join(lines)
+            # 1. robust extraction using helper
+            json_text = self._extract_json_substring(llm_output)
             
-            # Parse JSON
-            response_data = json.loads(cleaned_text)
+            # 2. Parse JSON
+            response_data = json.loads(json_text)
             
-            # Extract Fields
+            # 3. Extract Fields
             raw_sql = response_data.get("sql", "").strip()
             thought_process = response_data.get("thought_process", "")
             column_mapping = response_data.get("column_mapping", {})
             
-            # Flatten dict for consistency with expected_columns list format
+            # Flatten dict for consistency
             if isinstance(column_mapping, dict):
                 flattened_mapping = [f"{k}: {v}" for k, v in column_mapping.items()]
             
-            logger.info(f"Model Thought: {thought_process}")
-            logger.info(f"Column Mapping: {column_mapping}")
+            logger.info(f"🧠 Model Thought: {thought_process}")
+            logger.info(f"🗺️ Column Mapping: {column_mapping}")
 
         except json.JSONDecodeError as e:
-            logger.error(f"JSON Parse Failed: {e}. Output was: {llm_output[:100]}...")
-            # Fallback: Try to find raw SQL if JSON failed (Legacy support)
+            logger.error(f"❌ JSON Parse Failed: {e}. Raw Output snippet: {llm_output[:100]}...")
+            
+            # Fallback 1: Try to extract SQL via Regex
             sql_match = re.search(r'SELECT\s+.*', llm_output, re.DOTALL | re.IGNORECASE)
             if sql_match:
                 raw_sql = sql_match.group(0)
             else:
-                # Last resort cleanup
+                # Fallback 2: aggressive cleanup
                 raw_sql = llm_output.replace("```sql", "").replace("```", "").strip()
+            
+            # Fallback 3: Try to capture thought process via Regex if JSON failed
+            tp_match = re.search(r'(?:thought_process|explanation)["\s:]+(.*?)(?:sql|column_mapping|```)', llm_output, re.DOTALL | re.IGNORECASE)
+            if tp_match:
+                thought_process = tp_match.group(1).strip().strip('"').strip(',')
         # --- NEW JSON PARSING LOGIC END ---
 
         # 4. AST Validation & Formatting (SQLGlot)
         try:
             if not raw_sql:
-                raise ValueError("Empty SQL extracted from response")
+                # If raw_sql is still empty, look for a SELECT keyword one last time
+                if "SELECT" in llm_output.upper():
+                    raw_sql = llm_output[llm_output.upper().find("SELECT"):]
+                else:
+                    raise ValueError("Empty SQL extracted from response")
 
             # Transpile ensures valid BigQuery syntax
             clean_sql = sqlglot.transpile(
@@ -432,7 +462,7 @@ class SourcingAgent(BaseAgent):
         return SQLGenerationResponse(
             sql_query=clean_sql,
             metadata=QueryMetadata(
-                domain="SOURCING",
+                domain="COLLECTIONS" if "Collections" in self.name else "SOURCING",
                 intent=question,
                 generated_at=datetime.now(timezone.utc),
                 filters_applied={},
@@ -440,9 +470,8 @@ class SourcingAgent(BaseAgent):
                 output_tokens=output_tokens,
                 raw_thought_process=thought_process
             ),
-            # Use the model's thought process as explanation
             explanation=thought_process, 
-            expected_columns=flattened_mapping, # REUSE EXISTING FIELD
+            expected_columns=flattened_mapping, 
             formatting_hints={}
         )
     
